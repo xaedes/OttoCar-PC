@@ -13,7 +13,6 @@ from std_msgs.msg import Int8
 from std_msgs.msg import Int16
 from std_msgs.msg import Float32
 
-
 class Node(object):
     """docstring for Node"""
 
@@ -24,11 +23,10 @@ class Node(object):
         value = self.rescale(value,270,450)
         self.pub_angle.publish(Int16(data=int(value)))
         print 'angle: ', value
-        # pass
 
     def speed_cmd(self, value):
-        value = self.rescale(value,-20,20)
-        # value = self.rescale(value,-127,127)
+        value = self.rescale(value,-20,20)      # moderate speed
+        # value = self.rescale(value,-127,127)  # maximum speed
         self.pub_speed.publish(Int8(data=int(value)))
         print 'speed: ', value
 
@@ -42,8 +40,6 @@ class Node(object):
         print " closing..."
 
     def spin(self):
-        self.run = True
-        signal.signal(signal.SIGINT, self.keyboard_interupt)    
         while(self.run):
             # pygame events must be processed to get current values for joystick (happens in the background)
             pygame.event.pump()
@@ -54,24 +50,58 @@ class Node(object):
 
         # rospy.spin() 
 
-    def __init__(self):
-        super(Node, self).__init__()
-        rospy.init_node('example')
+    def assert_joystick_capabilities(self, i):
+        joystick = pygame.joystick.Joystick(i)
+        joystick.init()
 
-        # publisher for messages
-        self.pub_angle = rospy.Publisher('angle_cmd', Int16)
-        self.pub_speed = rospy.Publisher('speed_cmd', Int8)
+        # must have at least axis 1 and 3, i.e. 4 axes
 
-        # # Initialize the joysticks
+        if joystick.get_numaxes() < 4: 
+            return False
+
+        return True
+
+    def init_joystick(self):
         pygame.init()
         pygame.joystick.init()
-        self.joystick = pygame.joystick.Joystick(0)
-        self.joystick.init()
+        print "Number of joysticks: ", pygame.joystick.get_count()
+        if pygame.joystick.get_count()==0 :
+            print "No joystick plugged in. "
+            print "Plug in joystick and start again"
+            return False
 
 
-        # rospy.Subscriber('/current', Int16, self.callback_current)
+        print "Looking for capable joystick"
 
-        self.spin()
+        for i in xrange(0,pygame.joystick.get_count()):
+            if self.assert_joystick_capabilities(i):
+                self.joystick = pygame.joystick.Joystick(i)
+                self.joystick.init()
+                print "Capable joystick found."
+                return True
+
+        print "No capable joystick found."
+        print "Plug in capable (see self.assert_joystick_capabilities) joystick and start again"
+
+        return False
+    
+    def __init__(self):
+        super(Node, self).__init__()
+
+        self.run = True
+        signal.signal(signal.SIGINT, self.keyboard_interupt)  
+
+
+
+        # Initialize the joysticks
+        if self.init_joystick():
+            rospy.init_node('example')
+
+            # publisher for messages
+            self.pub_angle = rospy.Publisher('angle_cmd', Int16)
+            self.pub_speed = rospy.Publisher('speed_cmd', Int8)
+            
+            self.spin()
 
 
 
@@ -79,32 +109,3 @@ class Node(object):
 if __name__ == '__main__':
     Node()
     pygame.quit()
-
-# # -------- Main Program Loop -----------
-# while done==False:
-#     # EVENT PROCESSING STEP
-#     for event in pygame.event.get(): # User did something
-#         if event.type == pygame.QUIT: # If user clicked close
-#             done=True # Flag that we are done so we exit this loop
-        
-            
-#         joystick = pygame.joystick.Joystick(0)
-#         joystick.init()
-    
-#         obj.speed_cmd( -joystick.get_axis( 1 ))
-#         obj.kp_cmd( joystick.get_axis( 3 ))
-
-
-    
-#     # ALL CODE TO DRAW SHOULD GO ABOVE THIS COMMENT
-    
-#     # Go ahead and update the screen with what we've drawn.
-#     pygame.display.flip()
-
-#     # Limit to 20 frames per second
-#     clock.tick(20)
-    
-# # Close the window and quit.
-# # If you forget this line, the program will 'hang'
-# # on exit if running from IDLE.
-# pygame.quit ()
