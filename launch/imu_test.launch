@@ -42,6 +42,7 @@
 	args="load imu_filter_madgwick/ImuFilterNodelet imu_manager"
 	output="screen">
 		<param name="use_mag" value="true" />
+		<param name="fixed_frame " value="/odom" />
 		<!-- topic_out = /imu/data -->
 	</node>
 
