@@ -13,6 +13,27 @@ from std_msgs.msg import Int8
 from std_msgs.msg import Int16
 from std_msgs.msg import Float32
 
+class Accelerator(object):
+    """docstring for Accelerator"""
+    def __init__(self, max_acceleration, max_speed):
+        super(Accelerator, self).__init__()
+        
+        self.speed = 0
+        self.acceleration = 0
+        self.max_acceleration = max_acceleration
+        self.max_speed = max_speed
+
+        self.clock = pygame.time.Clock()
+        self.clock.tick()
+
+    def update(self):
+        dtime = self.clock.get_time() / 1000.0  # delta time in seconds
+
+        self.speed += dtime * self.acceleration
+        self.speed = min(self.speed, self.max_speed)
+
+        self.clock.tick()
+
 class Node(object):
     """docstring for Node"""
 
@@ -30,8 +51,19 @@ class Node(object):
         self.pub_speed.publish(Int8(data=int(value)))
         print 'speed: ', value
 
+    def accelerate_cmd(self, value):
+        value = self.rescale(value,-self.accel.max_acceleration,self.accel.max_acceleration)
+        self.accel.acceleration = value
+        self.accel.update()
+
+        print self.accel.speed
+        
+        # self.pub_speed.publish(Int8(data=int(10)))
+        self.pub_speed.publish(Int8(data=int(self.accel.speed)))
+
     def update(self):
-        self.speed_cmd( -self.joystick.get_axis( 1 ))
+        self.accelerate_cmd( -self.joystick.get_axis( 1 ))
+        # self.speed_cmd( -self.joystick.get_axis( 1 ))
         self.angle_cmd( self.joystick.get_axis( 3 ))
         
 
@@ -100,6 +132,8 @@ class Node(object):
             # publisher for messages
             self.pub_angle = rospy.Publisher('angle_cmd', Int16)
             self.pub_speed = rospy.Publisher('speed_cmd', Int8)
+
+            self.accel = Accelerator(max_acceleration = 1, max_speed=20)
             
             self.spin()
 
