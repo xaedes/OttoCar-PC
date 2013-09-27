@@ -1,0 +1,52 @@
+<launch>
+	<node pkg="rosserial_python" name="imu_serial" type="serial_node.py">
+		<param name="port" value="/dev/ttyACM0" />
+	</node>
+
+	<node pkg="ottocar_navigation" name="imu_calib" type="calibration_filter.py">
+		<param name="n_samples" value="1000" />
+		<param name="topic_in" value="/accelerometer/raw" />
+		<param name="topic_out_calibrated" value="/accelerometer/calibrated" />
+		<param name="topic_out_variances" value="/accelerometer/variances" />
+	</node>
+	<node pkg="ottocar_navigation" name="imu_calib_mag" type="calibration_filter.py">
+		<param name="n_samples" value="1000" />
+		<param name="topic_in" value="/magnetometer/raw" />
+		<param name="topic_out_calibrated" value="/magnetometer/calibrated" />
+		<param name="topic_out_variances" value="/magnetometer/variances" />
+	</node>
+	<node pkg="ottocar_navigation" name="imu_calib_gyro" type="calibration_filter.py">
+		<param name="n_samples" value="1000" />
+		<param name="topic_in" value="/gyroscope/raw" />
+		<param name="topic_out_calibrated" value="/gyroscope/calibrated" />
+		<param name="topic_out_variances" value="/gyroscope/variances" />
+	</node>
+
+	<node pkg="ottocar_utils" name="imu_conv_accel" type="imu_conv.py">
+		<param name="topic_out_imu" value="/imu/data_raw" />
+		<param name="topic_out_mag" value="/imu/mag" />
+		<param name="frame_id" value="/imu" />
+		<param name="topic_in_accelerometer" value="/accelerometer/raw" />
+		<param name="topic_in_magnetometer" value="/magnetometer/raw" />
+		<param name="topic_in_gyroscope" value="/gyroscope/calibrated" />
+		<param name="topic_in_accelerometer_variances" value="/accelerometer/variances" />
+		<param name="topic_in_magnetometer_variances" value="/magnetometer/variances" />
+		<param name="topic_in_gyroscope_variances" value="/gyroscope/variances" />
+	</node>	
+
+
+	<node pkg="nodelet" type="nodelet" name="imu_manager"
+	args="manager" output="screen" />
+
+	<node pkg="nodelet" type="nodelet" name="ImuFilterNodelet"
+	args="load imu_filter_madgwick/ImuFilterNodelet imu_manager"
+	output="screen">
+		<param name="use_mag" value="true" />
+		<!-- topic_out = /imu/data -->
+	</node>
+
+<!-- 	<node pkg="kalman_imu" name="kalman_filter" type="kalman_filter.py">
+		<param name="topic_in_orientation" value="/imu/data" />
+		<param name="topic_out_pose" value="/imu/data" />
+	</node> -->
+</launch>
