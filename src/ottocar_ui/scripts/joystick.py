@@ -78,13 +78,11 @@ class Node(object):
 
     def angle_cmd(self, value):
         # value = self.rescale(value,270,450)
-        print value
         value = self.axis_rescale(value,270,375,375,450)
         self.pub_angle.publish(Int16(data=int(value)))
         print 'angle: ', value
 
     def speed_cmd(self, value):
-        print value
         value = self.axis_rescale(value,-20,0,10,50)      
         # value = self.rescale(value,-20,20)      # moderate speed
         # value = self.rescale(value,-127,127)  # maximum speed
@@ -95,7 +93,10 @@ class Node(object):
         self.accelctrl.set_axis_value(value)
         self.accelctrl.update()
         speed = self.accelctrl.speed
-        if abs(speed) < 5:
+
+        # motor does not really start when abs(speed) is below a certain value
+        # so set it zero, that also improves the users ability to stop the car (i.e. speed=0) by accelerating/braking
+        if abs(speed) < 6:
             speed = 0
 
         print 'speed: ', speed
@@ -176,7 +177,7 @@ class Node(object):
 
         # Initialize the joysticks
         if self.init_joystick():
-            rospy.init_node('example')
+            rospy.init_node('joystick')
 
             # publisher for messages
             self.pub_angle = rospy.Publisher('angle_cmd', Int16)
