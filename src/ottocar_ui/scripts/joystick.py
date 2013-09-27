@@ -94,15 +94,24 @@ class Node(object):
     def accelerate_cmd(self, value):
         self.accelctrl.set_axis_value(value)
         self.accelctrl.update()
-        print 'speed: ', self.accelctrl.speed
+        speed = self.accelctrl.speed
+        if abs(speed) < 5:
+            speed = 0
 
+        print 'speed: ', speed
         
         # self.pub_speed.publish(Int8(data=int(10)))
+        self.pub_speed.publish(Int8(data=int(speed)))
+
+    def brake_to_zero(self):
+        self.accelctrl.speed = 0
         self.pub_speed.publish(Int8(data=int(self.accelctrl.speed)))
 
-
     def update(self):
-        self.accelerate_cmd( -self.joystick.get_axis( 1 ))
+        if self.joystick.get_button( 2 ) == 1:
+            self.brake_to_zero()
+        else:
+            self.accelerate_cmd( -self.joystick.get_axis( 1 ))
         # self.speed_cmd( -self.joystick.get_axis( 1 ))
         self.angle_cmd( self.joystick.get_axis( 3 ))
         
@@ -175,11 +184,11 @@ class Node(object):
 
             # self.accel = Accelerator(max_acceleration = 1, max_speed=20)
             self.accelctrl = AccelerationCarControl(    #accelerations given in 1/s
-                minimum_speed=-20, maximum_speed=20,
-                max_forward_acceleration=10, 
-                max_forward_brake=20, 
-                max_reverse_acceleration=10, 
-                max_reverse_brake=20)
+                minimum_speed=-40, maximum_speed=40,
+                max_forward_acceleration=20, 
+                max_forward_brake=40, 
+                max_reverse_acceleration=20, 
+                max_reverse_brake=40)
             
             self.spin()
 
