@@ -19,9 +19,14 @@ class CalibrateVector3(object):
         self.reset_calibration()
         self.start_calibration()
 
+        self.calc_mean = rospy.get_param('~calc_mean',True)
+        self.calc_std = rospy.get_param('~calc_std',True)
+
         rospy.Subscriber(topic_in, Vector3, self.callback)
         self.publisher_calibrated = rospy.Publisher(topic_calibrated, Vector3)
         self.publisher_variances = rospy.Publisher(topic_variances, Vector3)
+
+
 
 
     def callback(self, vec):
@@ -32,18 +37,21 @@ class CalibrateVector3(object):
         else:
             # print 'self.mean.shape', self.mean.shape
 
-            calibrated = Vector3()
-            calibrated.x = vec.x - self.mean[0]
-            calibrated.y = vec.y - self.mean[1]
-            calibrated.z = vec.z - self.mean[2]
+            if self.calc_mean:
+                calibrated = Vector3()
+                calibrated.x = vec.x - self.mean[0]
+                calibrated.y = vec.y - self.mean[1]
+                calibrated.z = vec.z - self.mean[2]
 
-            self.publisher_calibrated.publish(calibrated)
+                self.publisher_calibrated.publish(calibrated)
 
-            variances = Vector3()
-            variances.x = self.std[0]
-            variances.y = self.std[1]
-            variances.z = self.std[2]
-            self.publisher_variances.publish(variances)
+            if self.calc_std:
+                variances = Vector3()
+                variances.x = self.std[0]
+                variances.y = self.std[1]
+                variances.z = self.std[2]
+
+                self.publisher_variances.publish(variances)
 
     def start_calibration(self):
         self.calibrate = True
@@ -51,8 +59,10 @@ class CalibrateVector3(object):
     def stop_calibration(self):
         self.calibrate = False
         self.data_array = np.array(self.data)
-        self.mean = self.data_array.mean(axis=0)
-        self.std = self.data_array.std(axis=0)
+        if self.calc_mean:
+            self.mean = self.data_array.mean(axis=0)
+        if self.calc_std:
+            self.std = self.data_array.std(axis=0)
 
     def reset_calibration(self):
         self.data = []

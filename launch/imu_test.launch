@@ -11,8 +11,8 @@
 	</node>
 	<node pkg="ottocar_navigation" name="imu_calib_mag" type="calibration_filter.py">
 		<param name="n_samples" value="1000" />
+		<param name="calc_mean" value="False" />
 		<remap from="/in" to="/magnetometer/raw" />
-		<remap from="/calibrated" to="/magnetometer/calibrated" />
 		<remap from="/variances" to="/magnetometer/variances" />
 	</node>
 	<node pkg="ottocar_navigation" name="imu_calib_gyro" type="calibration_filter.py">
