@@ -1,8 +1,10 @@
 <launch>
+	<!-- pumps data from arduino to ros -->
 	<node pkg="rosserial_python" name="imu_serial" type="serial_node.py">
 		<param name="port" value="/dev/ttyACM0" />
 	</node>
 
+	<!-- calibrates imu data -->
 	<node pkg="ottocar_navigation" name="imu_calib" type="calibration_filter.py">
 		<param name="n_samples" value="1000" />
 		<remap from="/in" to="/accelerometer/raw" />
@@ -22,17 +24,16 @@
 		<remap from="/variances" to="/gyroscope/variances" />
 	</node>
 
-	<node pkg="ottocar_utils" name="imu_conv_accel" type="imu_conv.py">
+	<!-- converts imu data to Imu msgs (did not work on arduino) -->
+	<node pkg="ottocar_utils" name="imu_conv_accel" type="imu_conv.py" />
 
-	</node>	
 
-
-	<node pkg="nodelet" type="nodelet" name="imu_manager"
+	<!-- Calculates orientation from imu data -->
+	<node pkg="nodelet" type="nodelet" name="imu_nodelet_manager"
 	args="manager" output="screen" />
-
 	<node pkg="nodelet" type="nodelet" name="ImuFilterNodelet"
-	args="load imu_filter_madgwick/ImuFilterNodelet imu_manager"
-	output="screen">
+		args="load imu_filter_madgwick/ImuFilterNodelet imu_nodelet_manager"
+		output="screen">
 		<param name="use_mag" value="true" />
 		<param name="fixed_frame " value="/odom" />
 		<!-- topic_out = /imu/data -->
