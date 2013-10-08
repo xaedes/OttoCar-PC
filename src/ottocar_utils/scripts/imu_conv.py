@@ -83,10 +83,10 @@ class Collector(object):
         # create msg und publisher for output
         self.msg_imu = Imu()
         self.msg_mag = Vector3Stamped()
-        self.pub_imu = rospy.Publisher(rospy.get_param('~topic_out_imu'), Imu)
-        self.pub_mag = rospy.Publisher(rospy.get_param('~topic_out_mag'), Vector3Stamped)
+        self.pub_imu = rospy.Publisher('/imu/data_raw', Imu)
+        self.pub_mag = rospy.Publisher('/imu/mag', Vector3Stamped)
 
-        self.msg_imu.header.frame_id = self.msg_mag.header.frame_id = rospy.get_param('~frame_id')
+        self.msg_imu.header.frame_id = self.msg_mag.header.frame_id = rospy.get_param('~frame_id','/imu')
 
         self.msg_imu.orientation.x = 0
         self.msg_imu.orientation.y = 0
@@ -105,12 +105,12 @@ class Collector(object):
             self.msg_imu.linear_acceleration_covariance[k] = 1.0
 
         # subscribe to imu data
-        rospy.Subscriber(rospy.get_param('~topic_in_accelerometer'), Vector3, self.callback_accel)
-        rospy.Subscriber(rospy.get_param('~topic_in_magnetometer'), Vector3, self.callback_magnet)
-        rospy.Subscriber(rospy.get_param('~topic_in_gyroscope'), Vector3, self.callback_gyro)
-        self.subs_accel_var = rospy.Subscriber(rospy.get_param('~topic_in_accelerometer_variances'), Vector3, self.callback_accel_var)
+        rospy.Subscriber('/accelerometer/raw', Vector3, self.callback_accel)
+        rospy.Subscriber('/magnetometer/raw', Vector3, self.callback_magnet)
+        rospy.Subscriber('/gyroscope/calibrated', Vector3, self.callback_gyro)
+        self.subs_accel_var = rospy.Subscriber('/accelerometer/variances', Vector3, self.callback_accel_var)
         # self.subs_magnet_var = rospy.Subscriber(rospy.get_param('~topic_in_magnetometer_variances'), Vector3, self.callback_magnet_var)
-        self.subs_gyro_var = rospy.Subscriber(rospy.get_param('~topic_in_gyroscope_variances'), Vector3, self.callback_gyro_var)
+        self.subs_gyro_var = rospy.Subscriber('/gyroscope/variances', Vector3, self.callback_gyro_var)
         rospy.spin()
 
 
