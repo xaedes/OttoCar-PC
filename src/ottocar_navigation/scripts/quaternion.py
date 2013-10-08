@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
 
-#https://bitbucket.org/sirex/quaternion
+# derived from: https://bitbucket.org/sirex/quaternion
 
 import math
 
+from geometry_msgs.msg import Vector3
 
 def dbl2str(n):
     d = abs(int(n));
@@ -16,10 +17,21 @@ def dbl2str(n):
 
 class Quaternion(object):
     def __init__(q, w=0, x=0, y=0, z=0):
-        q.w = w
-        q.x = x
-        q.y = y
-        q.z = z
+
+        if hasattr(w,'x') and hasattr(w,'y') and hasattr(w,'z'):
+            # no it is possible to create a Quaternion from another object that has the neccessary attributes (i.e. ROS geometry_msgs/Quaternion)
+            q.x = w.x
+            q.y = w.y
+            q.z = w.z
+            if hasattr(w,'w'):
+                q.w = w.w
+            else:
+                q.w = 0
+        else:
+            q.w = w
+            q.x = x
+            q.y = y
+            q.z = z
 
     def __add__(q1, q2):
         return Quaternion(
@@ -104,3 +116,16 @@ class Quaternion(object):
         q.x = q.x / norm,
         q.y = q.y / norm,
         q.z = q.z / norm,
+
+    def as_vector3(self):
+        return Vector3(self.x, self.y, self.z)
+
+    def rotate_vector3(self, vector3):
+        """Returns the given vector rotated by the this quaternion"""
+        applied = self * vector3 * ~self
+        return Vector3(x=applied.x,y=applied.y,z=applied.z)
+
+    def inv_rotate_vector3(self, vector3):
+        """Returns the given vector rotated by the inverse of this quaternion"""
+        applied = ~self * Quaternion(vector3) * self
+        return applied.as_vector3()
