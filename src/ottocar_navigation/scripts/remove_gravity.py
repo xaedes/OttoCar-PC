@@ -28,7 +28,7 @@ class Node(object):
         signal.signal(signal.SIGINT, self.keyboard_interupt)  
 
         self.imu_data = Imu()
-        self.gravity = Vector3(0,0,-1)
+        self.gravity = Vector3(0,0,-9.81)
 
         rospy.Subscriber('/imu/data', Imu, self.callback_imu)
         self.pub_imu = rospy.Publisher('/imu/data_wo_gravity', Imu)
@@ -40,7 +40,7 @@ class Node(object):
         self.imu_data = data
 
         # transform gravity from global frame in imu frame:
-        #  rotate gravity (0,0,-1) by the inverse of the orientation of the imu 
+        #  rotate gravity (0,0,-g) by the inverse of the orientation of the imu 
         transformed_gravity = QuaternionAlg(self.imu_data.orientation).inv_rotate_vector3(self.gravity)
         self.imu_data.linear_acceleration.x -= transformed_gravity.x
         self.imu_data.linear_acceleration.y -= transformed_gravity.y
