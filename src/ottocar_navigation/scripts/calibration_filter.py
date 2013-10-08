@@ -61,9 +61,9 @@ class CalibrateVector3(object):
 if __name__ == '__main__':
     rospy.init_node('calibration_filter', anonymous=True)
     calib = CalibrateVector3(rospy.get_param('~n_samples',100), 
-                             rospy.get_param('~topic_in'), 
-                             rospy.get_param('~topic_out_calibrated'), 
-                             rospy.get_param('~topic_out_variances'))
+                             '/in', 
+                             '/calibrated', 
+                             '/variances')
     rospy.spin()
 
 

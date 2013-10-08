@@ -5,21 +5,21 @@
 
 	<node pkg="ottocar_navigation" name="imu_calib" type="calibration_filter.py">
 		<param name="n_samples" value="1000" />
-		<param name="topic_in" value="/accelerometer/raw" />
-		<param name="topic_out_calibrated" value="/accelerometer/calibrated" />
-		<param name="topic_out_variances" value="/accelerometer/variances" />
+		<remap from="/in" to="/accelerometer/raw" />
+		<remap from="/calibrated" to="/accelerometer/calibrated" />
+		<remap from="/variances" to="/accelerometer/variances" />
 	</node>
 	<node pkg="ottocar_navigation" name="imu_calib_mag" type="calibration_filter.py">
 		<param name="n_samples" value="1000" />
-		<param name="topic_in" value="/magnetometer/raw" />
-		<param name="topic_out_calibrated" value="/magnetometer/calibrated" />
-		<param name="topic_out_variances" value="/magnetometer/variances" />
+		<remap from="/in" to="/magnetometer/raw" />
+		<remap from="/calibrated" to="/magnetometer/calibrated" />
+		<remap from="/variances" to="/magnetometer/variances" />
 	</node>
 	<node pkg="ottocar_navigation" name="imu_calib_gyro" type="calibration_filter.py">
 		<param name="n_samples" value="1000" />
-		<param name="topic_in" value="/gyroscope/raw" />
-		<param name="topic_out_calibrated" value="/gyroscope/calibrated" />
-		<param name="topic_out_variances" value="/gyroscope/variances" />
+		<remap from="/in" to="/gyroscope/raw" />
+		<remap from="/calibrated" to="/gyroscope/calibrated" />
+		<remap from="/variances" to="/gyroscope/variances" />
 	</node>
 
 	<node pkg="ottocar_utils" name="imu_conv_accel" type="imu_conv.py">
