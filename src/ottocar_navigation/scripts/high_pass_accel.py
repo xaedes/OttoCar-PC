@@ -146,8 +146,8 @@ class Node(object):
         rospy.init_node(basename(__file__).replace('.','_'))
         signal.signal(signal.SIGINT, self.keyboard_interupt)
 
-        rospy.Subscriber('/joy/', Joy, self.callback_joystick)
-
+        if rospy.get_param('~use_joystick',False):
+            rospy.Subscriber('/joy/', Joy, self.callback_joystick)
 
         rospy.Subscriber('/accelerometer/raw', Vector3, self.callback)
         self.pub = rospy.Publisher('/accelerometer/high_pass', Vector3)
