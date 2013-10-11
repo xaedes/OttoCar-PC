@@ -6,22 +6,6 @@ from sensor_msgs.msg import Imu
 
 import sys
 
-
-# def callback(data):
-#     rospy.loginfo(rospy.get_name() + ": I heard %s" % data.data)
-
-
-# def talker():
-#     pub = rospy.Publisher('chatter', String)
-#     rospy.init_node('talker')
-#     while not rospy.is_shutdown():
-#         str = "hello world %s" % rospy.get_time()
-#         rospy.loginfo(str)
-#         pub.publish(String(str))
-#         rospy.sleep(1.0)
-
-# def listener():
-
 class Collector(object):
     """docstring for Foo"""
 
