@@ -12,4 +12,4 @@ $RSDIR/remake.sh
 source install/setup.bash
 
 rm -rf ~/ino/lib/ros_lib
-rosrun rosserial_arduino make_libraries.py /home/viki/ino/lib
+rosrun rosserial_arduino make_libraries.py ~/ino/lib
