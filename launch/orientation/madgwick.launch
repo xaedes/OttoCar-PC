@@ -1,0 +1,19 @@
+<launch>
+    <group unless="$(has_param /guard/madgwick)">
+        <param name="/guard/madgwick" value="True" />
+        <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_madgwick)" args="/guard/madgwick" />
+
+        <include file="$(find ottocar_utils)/../../launch/imu/connect_to_imu_on_avr.launch" />
+
+        <!-- Calculates orientation from imu data -->
+        <node pkg="nodelet" type="nodelet" name="$(anon imu_nodelet_manager)"
+        args="manager" output="screen" />
+        <node pkg="nodelet" type="nodelet" name="$(anon ImuFilterNodelet)"
+            args="load imu_filter_madgwick/ImuFilterNodelet $(anon imu_nodelet_manager)"
+            output="screen">
+            <param name="use_mag" value="true" />
+            <param name="fixed_frame " value="/odom" />
+            <!-- topic_out = /imu/data -->
+        </node>
+    </group>
+</launch>

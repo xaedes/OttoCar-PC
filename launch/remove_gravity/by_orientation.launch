@@ -1,0 +1,23 @@
+<launch>
+    <group unless="$(has_param /guard/remove_by_orientation)">
+        <param name="/guard/remove_by_orientation" value="True" />
+        <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_remove_by_orientation)" args="/guard/remove_by_orientation" />
+
+        <include file="$(find ottocar_utils)/../../launch/orientation/madgwick.launch" />        
+
+
+        <!-- Removes gravity from acceleration values -->
+        <node pkg="ottocar_navigation" name="$(anon remove_gravity)" type="remove_gravity.py" />
+        
+        <!-- visualization -->
+        <group if="$(has_param /viz)">
+            <!-- Starts rqt_plot with /imu/data_wo_gravity  -->
+            <node pkg="ottocar_utils" name="$(anon rqt_plot_data_wo_gravity)" type="exec.sh"
+                args="rqt_plot /imu/data_wo_gravity/linear_acceleration/x /imu/data_wo_gravity/linear_acceleration/y /imu/data_wo_gravity/linear_acceleration/z" />
+
+
+            <!-- Starts rviz to visualize orientation and acceleration of imu -->
+            <node pkg="rviz" name="$(anon rviz)" type="rviz" args="-d $(find ottocar_utils)/../../launch/test_remove_gravity.rviz" />
+        </group>
+    </group>
+</launch>

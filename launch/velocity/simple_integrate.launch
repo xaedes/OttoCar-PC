@@ -1,0 +1,16 @@
+<launch>
+    <group unless="$(has_param guard/simple_integrate)">
+        <param name="guard/simple_integrate" value="True" />
+        <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_simple_integrate)" args="guard/simple_integrate" />
+
+        <include file="$(find ottocar_utils)/../../launch/remove_gravity/by_orientation.launch" />
+
+        <node pkg="ottocar_navigation" name="$(anon calc_veloc)" type="calc_veloc.py" output="screen" />
+
+        <group if="$(has_param /viz)">
+            <!-- Starts rqt_plot with /velocity  -->
+            <node pkg="ottocar_utils" name="$(anon rqt_plot_velocity)" type="exec.sh"
+                args="rqt_plot /velocity/vector/x /velocity/vector/y /velocity/vector/z" />
+        </group>
+    </group>
+</launch>

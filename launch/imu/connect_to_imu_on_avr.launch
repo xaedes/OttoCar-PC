@@ -1,0 +1,30 @@
+<launch>
+    <group unless="$(has_param /guard/connect_to_imu_on_avr)">
+        <param name="/guard/connect_to_imu_on_avr" value="True" />
+        <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_connect_to_imu_on_avr)" args="/guard/connect_to_imu_on_avr" />
+
+        <!-- pumps data from arduino to ros -->
+        <node pkg="rosserial_python" name="$(anon imu_serial)" type="serial_node.py" respawn="true">
+            <param name="~port" value="/dev/ttyACM0" />
+            <param name="~baud" value="115200" />
+        </node>
+
+        <!-- calibrates imu data -->
+        <node pkg="ottocar_navigation" name="$(anon imu_calib_gyro)" type="calibration_filter.py">
+            <param name="n_samples" value="100" />
+            <remap from="/in" to="/gyroscope/raw" />
+            <remap from="/calibrated" to="/gyroscope/calibrated" />
+            <remap from="/variances" to="/gyroscope/variances" />
+        </node>
+        <node pkg="ottocar_navigation" name="$(anon imu_calib)" type="calibration_filter.py">
+            <param name="n_samples" value="100" />
+            <remap from="/in" to="/accelerometer/raw" />
+            <remap from="/calibrated" to="/accelerometer/calibrated" />
+            <remap from="/variances" to="/accelerometer/variances" />
+        </node>    
+
+        <!-- converts imu data to Imu msgs (did not work on arduino) -->
+        <node pkg="ottocar_utils" name="$(anon imu_conv_accel)" type="imu_conv.py" output="screen" />
+
+    </group>
+</launch>

@@ -1,0 +1,26 @@
+<launch>
+    <group unless="$(has_param /guard/compare_veloc_performance_of_high_pass_and_remove_gravity)">
+        <param name="/guard/compare_veloc_performance_of_high_pass_and_remove_gravity" value="True" />
+        <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_compare_veloc_performance_of_high_pass_and_remove_gravity)" args="/guard/compare_veloc_performance_of_high_pass_and_remove_gravity" />    
+
+        <group>
+            <remap from="/imu/data_wo_gravity" to="/imu/data_wo_gravity/by_orientation"/>
+            <remap from="/velocity" to="/velocity/by_orientation"/>
+            <include file="$(find ottocar_utils)/../../launch/remove_gravity/by_orientation.launch" />        
+            <include file="$(find ottocar_utils)/../../launch/velocity/simple_integrate.launch" />        
+        </group>
+        <group ns="/with_highpass">
+            <remap from="/imu/data_wo_gravity" to="/imu/data_wo_gravity/with_highpass"/>
+            <remap from="/velocity" to="/velocity/with_highpass"/>
+            <include file="$(find ottocar_utils)/../../launch/remove_gravity/with_highpass.launch" />        
+            <include file="$(find ottocar_utils)/../../launch/velocity/simple_integrate.launch" />
+        </group>
+
+        <node pkg="ottocar_utils" name="$(anon rqt_plot_velocity_by_orientation)" type="exec.sh"
+            args="rqt_plot /velocity/by_orientation/vector/x /velocity/by_orientation/vector/y /velocity/by_orientation/vector/z" />
+        <node pkg="ottocar_utils" name="$(anon rqt_plot_velocity_with_highpass)" type="exec.sh"
+            args="rqt_plot /velocity/with_highpass/vector/x /velocity/with_highpass/vector/y /velocity/with_highpass/vector/z" />
+
+
+    </group>
+</launch>
