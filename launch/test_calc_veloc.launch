@@ -2,9 +2,9 @@
     <!-- NOTE NOTE NOTE -->
     <!-- Expects test_remove_gravity.launch to be launched! -->
 
-    <node pkg="ottocar_navigation" name="calc_veloc" type="calc_veloc.py" output="screen"/>
+    <node pkg="ottocar_navigation" name="$(anon calc_veloc)" type="calc_veloc.py" output="screen"/>
 
     <!-- Starts rqt_plot with /velocity  -->
-    <node pkg="ottocar_utils" name="rqt_plot_velocity" type="exec.sh"
+    <node pkg="ottocar_utils" name="$(anon rqt_plot_velocity)" type="exec.sh"
         args="rqt_plot /velocity/vector/x /velocity/vector/y /velocity/vector/z" />
 </launch>

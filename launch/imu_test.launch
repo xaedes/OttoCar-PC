@@ -1,23 +1,23 @@
 <launch>
     <!-- pumps data from arduino to ros -->
-    <node pkg="rosserial_python" name="imu_serial" type="serial_node.py">
+    <node pkg="rosserial_python" name="$(anon imu_serial)" type="serial_node.py">
         <param name="port" value="/dev/ttyACM0" />
     </node>
 
     <!-- calibrates imu data -->
-    <node pkg="ottocar_navigation" name="imu_calib" type="calibration_filter.py">
+    <node pkg="ottocar_navigation" name="$(anon imu_calib)" type="calibration_filter.py">
         <param name="n_samples" value="1000" />
         <remap from="/in" to="/accelerometer/raw" />
         <remap from="/calibrated" to="/accelerometer/calibrated" />
         <remap from="/variances" to="/accelerometer/variances" />
     </node>
-    <node pkg="ottocar_navigation" name="imu_calib_mag" type="calibration_filter.py">
+    <node pkg="ottocar_navigation" name="$(anon imu_calib_mag)" type="calibration_filter.py">
         <param name="n_samples" value="1000" />
         <param name="calc_mean" value="False" />
         <remap from="/in" to="/magnetometer/raw" />
         <remap from="/variances" to="/magnetometer/variances" />
     </node>
-    <node pkg="ottocar_navigation" name="imu_calib_gyro" type="calibration_filter.py">
+    <node pkg="ottocar_navigation" name="$(anon imu_calib_gyro)" type="calibration_filter.py">
         <param name="n_samples" value="1000" />
         <remap from="/in" to="/gyroscope/raw" />
         <remap from="/calibrated" to="/gyroscope/calibrated" />
@@ -25,13 +25,13 @@
     </node>
 
     <!-- converts imu data to Imu msgs (did not work on arduino) -->
-    <node pkg="ottocar_utils" name="imu_conv_accel" type="imu_conv.py" />
+    <node pkg="ottocar_utils" name="$(anon imu_conv_accel)" type="imu_conv.py" />
 
 
     <!-- Calculates orientation from imu data -->
-    <node pkg="nodelet" type="nodelet" name="imu_nodelet_manager"
+    <node pkg="nodelet" type="nodelet" name="$(anon imu_nodelet_manager)"
     args="manager" output="screen" />
-    <node pkg="nodelet" type="nodelet" name="ImuFilterNodelet"
+    <node pkg="nodelet" type="nodelet" name="$(anon ImuFilterNodelet)"
         args="load imu_filter_madgwick/ImuFilterNodelet imu_nodelet_manager"
         output="screen">
         <param name="use_mag" value="true" />
@@ -39,7 +39,7 @@
         <!-- topic_out = /imu/data -->
     </node>
 
-<!--     <node pkg="kalman_imu" name="kalman_filter" type="kalman_filter.py">
+<!--     <node pkg="kalman_imu" name="$(anon kalman_filter)" type="kalman_filter.py">
         <param name="topic_in_orientation" value="/imu/data" />
         <param name="topic_out_pose" value="/imu/data" />
     </node> -->
