@@ -122,7 +122,7 @@ class Quaternion(object):
 
     def rotate_vector3(self, vector3):
         """Returns the given vector rotated by the this quaternion"""
-        applied = self * vector3 * ~self
+        applied = self * Quaternion(vector3) * ~self
         return Vector3(x=applied.x,y=applied.y,z=applied.z)
 
     def inv_rotate_vector3(self, vector3):
