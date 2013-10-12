@@ -24,7 +24,7 @@
         </node>    
 
         <!-- converts imu data to Imu msgs (did not work on arduino) -->
-        <node pkg="ottocar_utils" name="$(anon imu_conv_accel)" type="imu_conv.py" output="screen" />
+        <node pkg="ottocar_utils" name="$(anon imu_conv)" type="imu_conv.py" output="screen" />
 
     </group>
 </launch>
