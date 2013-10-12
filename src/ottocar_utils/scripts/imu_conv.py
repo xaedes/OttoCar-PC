@@ -88,6 +88,7 @@ class Collector(object):
             self.msg_imu.orientation_covariance[k] = 1.0
             self.msg_imu.linear_acceleration_covariance[k] = 1.0
 
+        rospy.sleep(1)
         # subscribe to imu data
         rospy.Subscriber('/accelerometer/raw', Vector3, self.callback_accel)
         rospy.Subscriber('/magnetometer/raw', Vector3, self.callback_magnet)
