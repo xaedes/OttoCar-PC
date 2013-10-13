@@ -266,8 +266,6 @@ class Node(object):
 
         
         if self.window.is_full():
-
-
             self.console_output() # todo move 2 lines up
 
             self.filter.update()
