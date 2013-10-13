@@ -6,6 +6,7 @@
 import math
 
 from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Quaternion as ROSQuaternion
 
 def dbl2str(n):
     d = abs(int(n));
@@ -89,6 +90,7 @@ class Quaternion(object):
     def as_tuple(self):
         return (self.w, self.x, self.y, self.z)
 
+
     def __str__(q):
         args = list(
             dbl2str(q.w) +
@@ -117,8 +119,26 @@ class Quaternion(object):
         q.y = q.y / norm,
         q.z = q.z / norm,
 
+    @staticmethod
+    def identity():
+        return Quaternion(1,0,0,0)
+
+    @staticmethod
+    def from_axis(rad, axis):
+        sin_rad = math.sin(rad/2.0)
+        return Quaternion(w=math.cos(rad/2.0),
+                          x=sin_rad * axis.x,
+                          y=sin_rad * axis.y,
+                          z=sin_rad * axis.z)
+
+
     def as_vector3(self):
         return Vector3(self.x, self.y, self.z)
+
+
+    def as_rosquaternion(self):
+        return ROSQuaternion(w=self.w,x=self.x,y=self.y,z=self.z)
+
 
     def rotate_vector3(self, vector3):
         """Returns the given vector rotated by the this quaternion"""
