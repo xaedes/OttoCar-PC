@@ -9,8 +9,12 @@
             <param name="/guard/viz/synth_data" value="True" />
             <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_viz_synth_data)" args="/guard/viz/synth_data" />
 
+            <!-- Starts rqt_plot with /synth/velocity  -->
+            <node pkg="ottocar_utils" name="$(anon rqt_plot_synth_velocity)" type="exec.sh"
+                args="rqt_plot /synth/velocity/x /synth/velocity/y" />
+
             <!-- Starts rviz to visualize the synthesized data -->
-            <node pkg="rviz" name="$(anon synth_data_rviz)" type="rviz" args="-d $(find ottocar_utils)/../../rviz/synth_data.rviz" />
+            <node pkg="rviz" name="$(anon synth_data_rviz)" type="rviz" output="screen" args="-d $(find ottocar_utils)/../../rviz/synth_data.rviz" />
         </group>
     </group>
 </launch>

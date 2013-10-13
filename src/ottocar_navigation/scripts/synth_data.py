@@ -7,7 +7,7 @@ import signal
 
 from os.path import basename
 
-from math import pi,sin,cos
+from math import pi,sin,cos,sqrt
 
 import rospy
 from geometry_msgs.msg import Pose
@@ -27,25 +27,50 @@ class Node(object):
         signal.signal(signal.SIGINT, self.keyboard_interupt)  
         self.run = True
 
-        self.publish_rate = rospy.get_param('~publish_rate', 5)   # in hz
-        self.interval =  1 / self.publish_rate
+        self.publish_rate = rospy.get_param('~publish_rate', 100)   # in hz
+        self.interval =  1.0 / self.publish_rate
      
         self.pub_imu = rospy.Publisher('/synth/imu', Imu)
+        self.pub_veloc = rospy.Publisher('/synth/velocity', Vector3)
         self.pub_pose = rospy.Publisher('/synth/pose', PoseStamped)
+        self.pub_mag = rospy.Publisher('/synth/mag', Vector3)
 
         self.start_time = self.last_time = rospy.Time.now().to_sec()
         self.spin()
 
-    def circular_path(self, radius = 1, angular_speed = 2*pi / 10, center = Vector3(0,0,0) ):
+    def ease_sin_inout(self, t, start=0, change=1, duration=1):
+        return -(change/2)*(cos(pi*t/duration)-1)+start
+
+    def integrated_ease_sin_inout(self, t, start=0, change=1, duration=1):
+        return (change/2)*(t-(duration/pi)*(sin(pi*t/duration)+1))+start*t
+
+
+
+    def circular_path(self, radius = 1, angular_speed_increase_time = 15, max_angular_speed = 1*2*pi / 5, center = Vector3(0,0,0) ):
         # move along a circular path in xy-plane
 
         # init msgs
         stamped = PoseStamped()
         stamped.header.stamp = rospy.Time.now()
         stamped.header.frame_id = "/synth"
+        imu = Imu()
+        imu.header = stamped.header
+
+
+        if self.total_time < angular_speed_increase_time:
+            # use sinusoidal in/out ease to increase angular_speed
+            angular_speed = self.ease_sin_inout(self.total_time, change=max_angular_speed, duration=angular_speed_increase_time)
+        else:
+            angular_speed = max_angular_speed
 
         # position on circle
-        angle = angular_speed * self.total_time
+        if self.total_time < angular_speed_increase_time:
+            # integration of speed easing
+            angle = self.integrated_ease_sin_inout(self.total_time, change=max_angular_speed, duration=angular_speed_increase_time)
+        else:
+            angle = self.integrated_ease_sin_inout(angular_speed_increase_time, change=max_angular_speed, duration=angular_speed_increase_time)
+            angle += angular_speed * (self.total_time - angular_speed_increase_time)
+
         stamped.pose.position.x = center.x + cos(angle) * radius
         stamped.pose.position.y = center.y + sin(angle) * radius
         stamped.pose.position.z = center.z
@@ -55,12 +80,51 @@ class Node(object):
         # y-axis pointing to the center
         # z-axis pointing upwards 
         quat = QuaternionAlg.identity() 
-        quat *= QuaternionAlg.from_axis(rad=angle+pi/2,axis=Vector3(x=0,y=0,z=1))
+        quat *= QuaternionAlg.from_axis(
+            rad=angle+pi/2,
+            axis=Vector3(x=0,y=0,z=1))
         stamped.pose.orientation = quat.as_rosquaternion()
+        
+        velocity = Vector3()
+        perimeter = 2*pi*radius
+        rpm = angular_speed / (2*pi)
+        speed = perimeter * rpm
 
+        velocity = quat.inv_rotate_vector3( Vector3(0,speed,0) )
 
+        # project north to global y-xis
+        mag = Vector3(x=0,y=1,z=0)
+        mag = quat.inv_rotate_vector3(mag)
 
+        imu.orientation = stamped.pose.orientation
+        imu.angular_velocity.x = 0
+        imu.angular_velocity.y = 0
+        imu.angular_velocity.z = angular_speed
+
+        vec = Vector3()
+        # vec.z = -9.81
+        if self.total_time < angular_speed_increase_time:
+            # after doing the math (second derivative of position calculation) i came up with following:
+            vec.x = -radius * (cos(angle)*angular_speed*angular_speed + (max_angular_speed*pi/
+                (2*angular_speed_increase_time)) * sin(angle) * sin(pi*self.total_time/angular_speed_increase_time) )
+            vec.y = radius * (-sin(angle)*angular_speed*angular_speed + (max_angular_speed*pi/
+                (2*angular_speed_increase_time)) * cos(angle) * sin(pi*self.total_time/angular_speed_increase_time) )
+
+                
+        else:
+            # acceleration on uniform circular motion points towards the mid
+            # http://de.wikipedia.org/wiki/Gleichf%C3%B6rmige_Kreisbewegung
+            abs_accel = radius * angular_speed * angular_speed
+            
+            vec.x = - cos(angle) * abs_accel
+            vec.y = - sin(angle) * abs_accel
+
+        imu.linear_acceleration = quat.inv_rotate_vector3( vec )
+
+        self.pub_imu.publish(imu)
+        self.pub_veloc.publish(velocity)
         self.pub_pose.publish(stamped)
+        self.pub_mag.publish(mag)
 
     def update(self):
         now = rospy.Time.now().to_sec()
@@ -109,6 +173,8 @@ class Node(object):
             self.update()
             update_time = rospy.Time.now().to_sec() - start   # time needed for update
             sleep_time = self.interval - update_time               
+            # sleep_time = self.interval #- update_time
+            # print sleep_time
             if sleep_time > 0:
                 sleep(sleep_time)                      
 
