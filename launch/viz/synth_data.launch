@@ -1,5 +1,6 @@
 <launch>
     <group unless="$(has_param /viz/synth_data)">
+        <!-- Inform via log that visualization will not be started because of not set parameter. -->
         <node pkg="ottocar_utils" type="log.py" name="$(anon logerr_viz_synth_data)"  output="screen"
             args="info 'Parameter /viz/synth_data not set, so no visualization started.'"/>
     </group>
