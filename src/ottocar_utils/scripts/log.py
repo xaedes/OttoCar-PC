@@ -31,5 +31,4 @@ if __name__ == '__main__':
         if t in ["debug","info","warn","err","fatal"]:
             log = getattr(rospy,"log%s" % t)
             log(msg)
-        # rospy.logerr(str.format(sys.argv[2],*sys.argv[3:]))
     
