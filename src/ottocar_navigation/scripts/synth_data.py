@@ -14,6 +14,7 @@ from geometry_msgs.msg import Pose
 from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Vector3Stamped
 from sensor_msgs.msg import Imu
 
 from quaternion import Quaternion as QuaternionAlg
@@ -33,7 +34,7 @@ class Node(object):
         self.pub_imu = rospy.Publisher('/synth/imu', Imu)
         self.pub_veloc = rospy.Publisher('/synth/velocity', Vector3)
         self.pub_pose = rospy.Publisher('/synth/pose', PoseStamped)
-        self.pub_mag = rospy.Publisher('/synth/mag', Vector3)
+        self.pub_mag = rospy.Publisher('/synth/mag', Vector3Stamped)
 
         self.start_time = self.last_time = rospy.Time.now().to_sec()
         self.spin()
@@ -53,6 +54,8 @@ class Node(object):
         stamped = PoseStamped()
         stamped.header.stamp = rospy.Time.now()
         stamped.header.frame_id = "/synth"
+        mag = Vector3Stamped()
+        mag.header = stamped.header
         imu = Imu()
         imu.header = stamped.header
 
@@ -93,8 +96,7 @@ class Node(object):
         velocity = quat.inv_rotate_vector3( Vector3(0,speed,0) )
 
         # project north to global y-xis
-        mag = Vector3(x=0,y=1,z=0)
-        mag = quat.inv_rotate_vector3(mag)
+        mag.vector =  quat.inv_rotate_vector3(Vector3(x=0,y=1,z=0))
 
         imu.orientation = stamped.pose.orientation
         imu.angular_velocity.x = 0
@@ -102,7 +104,7 @@ class Node(object):
         imu.angular_velocity.z = angular_speed
 
         vec = Vector3()
-        # vec.z = -9.81
+        vec.z = -9.81
         if self.total_time < angular_speed_increase_time:
             # after doing the math (second derivative of position calculation) i came up with following:
             vec.x = -radius * (cos(angle)*angular_speed*angular_speed + (max_angular_speed*pi/
@@ -120,6 +122,7 @@ class Node(object):
             vec.y = - sin(angle) * abs_accel
 
         imu.linear_acceleration = quat.inv_rotate_vector3( vec )
+
 
         self.pub_imu.publish(imu)
         self.pub_veloc.publish(velocity)
@@ -173,8 +176,6 @@ class Node(object):
             self.update()
             update_time = rospy.Time.now().to_sec() - start   # time needed for update
             sleep_time = self.interval - update_time               
-            # sleep_time = self.interval #- update_time
-            # print sleep_time
             if sleep_time > 0:
                 sleep(sleep_time)                      
 
