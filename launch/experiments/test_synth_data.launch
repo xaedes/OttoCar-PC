@@ -1,0 +1,22 @@
+<launch>
+    <group unless="$(has_param /guard/experiments/test_synth_data)">
+        <param name="/guard/experiments/test_synth_data" value="True" />
+        <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_experiments_test_synth_data)" args="/guard/experiments/test_synth_data" />    
+
+        <include file="$(find ottocar_utils)/../../launch/synth/circular.launch" />        
+
+        <remap from="/imu/data_raw" to="/synth/imu" />
+        <remap from="/imu/mag" to="/synth/mag" />
+        
+        <param name="/guard/connect_to_imu_on_avr" value="True" /> <!-- avoid start of imu connect -->
+        <include file="$(find ottocar_utils)/../../launch/orientation/madgwick.launch" />
+        <include file="$(find ottocar_utils)/../../launch/remove_gravity/by_orientation.launch" />
+        <param name="/guard/remove_with_highpass" value="True" /> <!-- avoid start high pass filter -->
+        <include file="$(find ottocar_utils)/../../launch/velocity/simple_integrate.launch" />
+        <include file="$(find ottocar_utils)/../../launch/pose/simple_integrate.launch" />
+
+        
+
+
+    </group>
+</launch>
