@@ -51,7 +51,6 @@ class Node(object):
     def callback_veloc(self, data):
         if self.first:
             self.velocity = data
-            self.imu_data = data
             self.first = False
             return
 
