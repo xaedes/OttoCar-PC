@@ -44,7 +44,7 @@ class Node(object):
         return -(change/2)*(cos(pi*t/duration)-1)+start
 
     def integrated_ease_sin_inout(self, t, start=0.0, change=1.0, duration=1.0):
-        return (change/2)*(t-(duration/pi)*(sin(pi*t/duration)+1))+start*t
+        return -(change/2)*((duration/pi)*sin(pi*t/duration)-t)+start*t
 
 
 
@@ -52,7 +52,7 @@ class Node(object):
         # move along a circular path in xy-plane
 
         # so starting point is at (0,0,0)
-        center.y = -radius       
+        center.x = -radius       
 
         # init msgs
         stamped = PoseStamped()
