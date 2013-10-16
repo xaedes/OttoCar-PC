@@ -4,8 +4,8 @@ from distutils.core import setup
 from catkin_pkg.python_setup import generate_distutils_setup
 
 d = generate_distutils_setup(
-    packages=['spark'],
-    package_dir={'': ''},
+    packages=['ottocar_utils'],
+    package_dir={'ottocar_utils': 'scripts'},
     scripts=[],
     requires=[]
 )
