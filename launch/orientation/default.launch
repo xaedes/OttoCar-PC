@@ -1,0 +1,11 @@
+<launch>
+    <group unless="$(has_param /guard/orientation/default)">
+        <param name="/guard/orientation/default" value="True" />
+        <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_orientation_default)" args="/guard/orientation/default" />
+
+        <!-- Default file for orientation -->
+
+        <!-- start madgwick filter -->
+        <include file="$(launch_dir)/madgwick.launch" />
+    </group>
+</launch>

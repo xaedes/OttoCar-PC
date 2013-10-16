@@ -1,0 +1,11 @@
+<launch>
+    <group unless="$(has_param /guard/imu/default)">
+        <param name="/guard/imu/default" value="True" />
+        <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_imu_default)" args="/guard/imu/default" />
+
+        <!-- Default file for imu -->
+
+        <!-- connect to imu on avr -->
+        <include file="$(launch_dir)/connect_to_imu_on_avr.launch" />
+    </group>
+</launch>
