@@ -14,7 +14,7 @@ from geometry_msgs.msg import Vector3
 from std_msgs.msg import Int32
 from sensor_msgs.msg import Joy
 
-import spark
+from ottocar_utils import spark
 
 import numpy as np
 
