@@ -37,3 +37,5 @@ class MeasureSampleRate(object):
         return long(self.sample_rate)
     def __float__(self):
         return float(self.sample_rate)
+
+__all__ = ['MeasureSampleRate']
