@@ -17,5 +17,8 @@
         
         <!-- Calculate pose from synthetic velocity and orientation data -->
         <include file="$(find ottocar_utils)/../../launch/pose/simple_integrate.launch" />
+
+        <!-- Visualization -->
+        <include file="$(find ottocar_utils)/../../launch/viz/eval_calc_pose_with_synth_data.launch" />
     </group>
 </launch>
