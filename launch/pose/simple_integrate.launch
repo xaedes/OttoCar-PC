@@ -8,7 +8,7 @@
         
         <node pkg="ottocar_navigation" name="$(anon calc_pos)" type="calc_pose.py" output="screen" />
 
-        <group if="$(has_param /viz)">
+        <group if="$(has_param /viz/pose/simple_integrate)">
             <!-- Starts rqt_plot with /velocity  -->
             <node pkg="ottocar_utils" name="$(anon rqt_plot_velocity)" type="exec.sh"
                 args="rqt_plot /velocity/vector/x /velocity/vector/y /velocity/vector/z" />
