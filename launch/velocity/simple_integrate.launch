@@ -3,8 +3,8 @@
         <param name="guard/velocity/simple_integrate" value="True" />
         <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_simple_integrate)" args="guard/velocity/simple_integrate" />
 
-        <include file="$(find ottocar_utils)/../../launch/remove_gravity/by_orientation.launch" />
-        <!-- <include file="$(find ottocar_utils)/../../launch/remove_gravity/with_highpass.launch" /> -->
+        <include file="$(find ottocar_utils)/../../launch/remove_gravity/default.launch" unless="$(has_param dont_include_default)"/>
+        
 
         <node pkg="ottocar_navigation" name="$(anon calc_veloc)" type="calc_veloc.py" output="screen" />
 

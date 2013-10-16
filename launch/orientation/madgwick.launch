@@ -3,7 +3,7 @@
         <param name="/guard/madgwick" value="True" />
         <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_madgwick)" args="/guard/madgwick" />
 
-        <include file="$(find ottocar_utils)/../../launch/imu/connect_to_imu_on_avr.launch" />
+        <include file="$(find ottocar_utils)/../../launch/imu/default.launch" unless="$(has_param dont_include_default)"/>
 
         <!-- Calculates orientation from imu data -->
         <node pkg="nodelet" type="nodelet" name="$(anon imu_nodelet_manager)"

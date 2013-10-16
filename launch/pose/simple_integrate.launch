@@ -3,8 +3,8 @@
         <param name="guard/pose/simple_integrate" value="True" />
         <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_simple_integrate)" args="guard/pose/simple_integrate" />
 
-        <include file="$(find ottocar_utils)/../../launch/velocity/simple_integrate.launch" />
-        <include file="$(find ottocar_utils)/../../launch/orientation/madgwick.launch" />    
+        <include file="$(find ottocar_utils)/../../launch/velocity/default.launch" unless="$(has_param /dont_include_default)"/>
+        <include file="$(find ottocar_utils)/../../launch/orientation/default.launch" unless="$(has_param /dont_include_default)"/>    
         
         <node pkg="ottocar_navigation" name="$(anon calc_pos)" type="calc_pose.py" output="screen" />
 

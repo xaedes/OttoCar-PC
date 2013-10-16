@@ -3,7 +3,7 @@
         <param name="/guard/remove_with_highpass" value="True" />
         <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_remove_with_highpass)" args="/guard/remove_with_highpass" />
 
-        <include file="$(find ottocar_utils)/../../launch/imu/connect_to_imu_on_avr.launch" />
+        <include file="$(find ottocar_utils)/../../launch/imu/default.launch" unless="$(has_param dont_include_default)"/>
 
         <!-- Starts joystick node to control high pass values -->
         <node pkg="joy" name="$(anon joystick)" type="joy_node">

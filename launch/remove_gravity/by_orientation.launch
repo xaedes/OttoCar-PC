@@ -3,7 +3,7 @@
         <param name="/guard/remove_by_orientation" value="True" />
         <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_remove_by_orientation)" args="/guard/remove_by_orientation" />
 
-        <include file="$(find ottocar_utils)/../../launch/orientation/madgwick.launch" />        
+        <include file="$(find ottocar_utils)/../../launch/orientation/default.launch" unless="$(has_param dont_include_default)"/>        
 
 
         <!-- Removes gravity from acceleration values -->
