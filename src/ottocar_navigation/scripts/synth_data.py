@@ -32,7 +32,8 @@ class Node(object):
         self.interval =  1.0 / self.publish_rate
      
         self.pub_imu = rospy.Publisher('/synth/imu', Imu)
-        self.pub_veloc = rospy.Publisher('/synth/velocity', Vector3)
+        self.pub_veloc = rospy.Publisher('/synth/velocity', Vector3Stamped)
+        self.pub_gveloc = rospy.Publisher('/synth/global_velocity', Vector3Stamped)
         self.pub_pose = rospy.Publisher('/synth/pose', PoseStamped)
         self.pub_mag = rospy.Publisher('/synth/mag', Vector3Stamped)
 
@@ -47,18 +48,22 @@ class Node(object):
 
 
 
-    def circular_path(self, radius = 1, angular_speed_increase_time = 15, max_angular_speed = 1*2*pi / 5, center = Vector3(0,0,0) ):
+    def circular_path(self, radius = 1, angular_speed_increase_time = 150, max_angular_speed = 1*2*pi / 5, center = Vector3(0,0,0) ):
         # move along a circular path in xy-plane
 
         # init msgs
         stamped = PoseStamped()
+        mag = Vector3Stamped()
+        velocity = Vector3Stamped()
+        global_velocity = Vector3Stamped()
+        imu = Imu()
+
         stamped.header.stamp = rospy.Time.now()
         stamped.header.frame_id = "/synth"
-        mag = Vector3Stamped()
         mag.header = stamped.header
-        imu = Imu()
         imu.header = stamped.header
-
+        velocity.header = stamped.header
+        global_velocity.header = stamped.header
 
         if self.total_time < angular_speed_increase_time:
             # use sinusoidal in/out ease to increase angular_speed
@@ -88,12 +93,12 @@ class Node(object):
             axis=Vector3(x=0,y=0,z=1))
         stamped.pose.orientation = quat.as_rosquaternion()
         
-        velocity = Vector3()
         perimeter = 2*pi*radius
         rpm = angular_speed / (2*pi)
         speed = perimeter * rpm
 
-        velocity = quat.inv_rotate_vector3( Vector3(0,speed,0) )
+        velocity.vector = Vector3(0,speed,0)
+        global_velocity.vector = quat.inv_rotate_vector3( velocity.vector )
 
         # project north to global y-xis
         mag.vector =  quat.inv_rotate_vector3(Vector3(x=0,y=1,z=0))
@@ -104,7 +109,7 @@ class Node(object):
         imu.angular_velocity.z = angular_speed
 
         vec = Vector3()
-        vec.z = -9.81
+        vec.z = 9.81
         if self.total_time < angular_speed_increase_time:
             # after doing the math (second derivative of position calculation) i came up with following:
             vec.x = -radius * (cos(angle)*angular_speed*angular_speed + (max_angular_speed*pi/
@@ -121,11 +126,13 @@ class Node(object):
             vec.x = - cos(angle) * abs_accel
             vec.y = - sin(angle) * abs_accel
 
+        # imu.linear_acceleration = vec
         imu.linear_acceleration = quat.inv_rotate_vector3( vec )
 
 
         self.pub_imu.publish(imu)
         self.pub_veloc.publish(velocity)
+        self.pub_gveloc.publish(global_velocity)
         self.pub_pose.publish(stamped)
         self.pub_mag.publish(mag)
 
