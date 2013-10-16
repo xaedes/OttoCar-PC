@@ -40,16 +40,19 @@ class Node(object):
         self.start_time = self.last_time = rospy.Time.now().to_sec()
         self.spin()
 
-    def ease_sin_inout(self, t, start=0, change=1, duration=1):
+    def ease_sin_inout(self, t, start=0.0, change=1.0, duration=1.0):
         return -(change/2)*(cos(pi*t/duration)-1)+start
 
-    def integrated_ease_sin_inout(self, t, start=0, change=1, duration=1):
+    def integrated_ease_sin_inout(self, t, start=0.0, change=1.0, duration=1.0):
         return (change/2)*(t-(duration/pi)*(sin(pi*t/duration)+1))+start*t
 
 
 
     def circular_path(self, radius = 1, angular_speed_increase_time = 150, max_angular_speed = 1*2*pi / 5, center = Vector3(0,0,0) ):
         # move along a circular path in xy-plane
+
+        # so starting point is at (0,0,0)
+        center.y = -radius       
 
         # init msgs
         stamped = PoseStamped()
@@ -79,6 +82,7 @@ class Node(object):
             angle = self.integrated_ease_sin_inout(angular_speed_increase_time, change=max_angular_speed, duration=angular_speed_increase_time)
             angle += angular_speed * (self.total_time - angular_speed_increase_time)
 
+
         stamped.pose.position.x = center.x + cos(angle) * radius
         stamped.pose.position.y = center.y + sin(angle) * radius
         stamped.pose.position.z = center.z
@@ -97,8 +101,8 @@ class Node(object):
         rpm = angular_speed / (2*pi)
         speed = perimeter * rpm
 
-        velocity.vector = Vector3(0,speed,0)
-        global_velocity.vector = quat.inv_rotate_vector3( velocity.vector )
+        velocity.vector = Vector3(speed,0,0)
+        global_velocity.vector = quat.rotate_vector3( velocity.vector )
 
         # project north to global y-xis
         mag.vector =  quat.inv_rotate_vector3(Vector3(x=0,y=1,z=0))
@@ -145,29 +149,6 @@ class Node(object):
 
         self.circular_path()
                
-
-
-
-        # # update position
-
-        # # apply orientation to velocity 
-        # #  http://content.gpwiki.org/index.php/OpenGL%3aTutorials%3aUsing_Quaternions_to_represent_rotation#Rotating_vectors
-        # #  rotate velocity by pose quaternion and add it to position
-
-        # velocity_quat = QuaternionAlg(w=0,x=self.velocity.x,y=self.velocity.y,z=self.velocity.z)
-        # quat = Node.fromROSQuat(self.pose.orientation)
-        # rotated = quat * velocity_quat * ~quat
-
-        # self.pose.position.x += rotated.x * dtime
-        # self.pose.position.y += rotated.y * dtime
-        # self.pose.position.z += rotated.z * dtime
-
-        # print self.pose
-        # stamped = PoseStamped()
-        # stamped.pose = self.pose
-        # stamped.header.stamp = rospy.Time.now()
-        # stamped.header.frame_id = "/odom"
-        # self.pub_pose.publish(stamped)
 
         
     def keyboard_interupt(self, signum, frame):
