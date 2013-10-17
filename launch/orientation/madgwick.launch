@@ -11,8 +11,9 @@
         <node pkg="nodelet" type="nodelet" name="$(anon ImuFilterNodelet)"
             args="load imu_filter_madgwick/ImuFilterNodelet $(anon imu_nodelet_manager)"
             output="screen">
-            <param name="use_mag" value="true" />
+            <param name="use_mag" value="True" />
             <param name="fixed_frame " value="/odom" />
+            <!-- <param name="gain" value="0.001" /> -->
             <!-- topic_out = /imu/data -->
         </node>
     </group>
