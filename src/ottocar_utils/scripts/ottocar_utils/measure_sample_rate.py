@@ -3,7 +3,7 @@ import rospy
 
 class MeasureSampleRate(object):
     """docstring for MeasureSampleRate"""
-    def __init__(self, update_interval, gain):
+    def __init__(self, update_interval = 10, gain = 0.5):
         super(MeasureSampleRate, self).__init__()
         self.sample_rate = 1
         self.gain = gain
@@ -28,6 +28,8 @@ class MeasureSampleRate(object):
             self.sample_rate = current_sample_rate
 
         self.sample_rate = self.sample_rate * (1-self.gain) + current_sample_rate * self.gain        
+
+        return self.sample_rate
 
     def __complex__(self):
         return complex(self.sample_rate)
