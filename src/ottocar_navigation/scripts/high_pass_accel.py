@@ -165,8 +165,8 @@ class Node(object):
         self.stop = False
 
 
-        rospy.Subscriber('/accelerometer/raw', Vector3, self.callback)
-        self.pub = rospy.Publisher('/accelerometer/high_pass', Vector3)
+        rospy.Subscriber('/topic_in', Vector3, self.callback)
+        self.pub = rospy.Publisher('/topic_out', Vector3)
 
         rospy.spin()
 
