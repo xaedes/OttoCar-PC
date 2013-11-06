@@ -4,7 +4,9 @@
         <node pkg="ottocar_utils" type="launch_guard.py" name="$(anon guard_synth_circular)" args="/guard/synth/circular" />
 
         <!-- Synthesizes imu and pose data along a circular path -->
-        <node pkg="ottocar_navigation" name="$(anon synth_data)" type="synth_data.py" output="screen" required="true" />
+        <node pkg="ottocar_navigation" name="$(anon synth_data)" type="synth_data.py" output="screen" required="true">
+            <param name="publish_rate" value="100" />
+        </node>
 
         <!-- Visualization of the synthesizes data (with rviz) -->
         <include file="$(find ottocar_utils)/../../launch/viz/synth_data.launch" />
