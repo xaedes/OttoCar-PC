@@ -28,7 +28,7 @@ class Node(object):
         signal.signal(signal.SIGINT, self.keyboard_interupt)  
 
         self.imu_data = Imu()
-        self.gravity = Vector3(0,0,9.81)
+        self.gravity = Vector3(0,0,9.81)    # madgwick filter orientation assumes gravity to point upwards the z-axis
 
         rospy.Subscriber('/imu/data', Imu, self.callback_imu)
         self.pub_imu = rospy.Publisher('/imu/data_wo_gravity', Imu)
