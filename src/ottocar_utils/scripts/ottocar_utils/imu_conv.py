@@ -7,7 +7,7 @@ from sensor_msgs.msg import Imu
 import sys
 
 class Collector(object):
-    """docstring for Foo"""
+    """Collects data from imu and outputs it in different format"""
 
 
     def try_publish(self):
