@@ -16,6 +16,8 @@
             <!-- start high pass filter over accelerometer to filter out gravity -->
             <node pkg="ottocar_navigation" name="$(anon high_pass_accel)" type="high_pass_accel.py" output="screen" required="true">
                 <param name="use_joystick" value="True" />
+                <remap from="topic_in" to="/accelerometer/raw" />
+                <remap from="topic_out" to="/accelerometer/high_pass" />
             </node>
         </group>
 
@@ -29,6 +31,8 @@
             <node pkg="ottocar_navigation" name="$(anon high_pass_accel)" type="high_pass_accel.py" output="screen" required="true">
                 <remap from="/accelerometer/raw" to="/accelerometer/raw_drop" />
                 <param name="use_joystick" value="True" />
+                <remap from="topic_in" to="/accelerometer/raw" />
+                <remap from="topic_out" to="/accelerometer/high_pass" />
             </node>
 
             <!-- Starts rqt_plot with /velocity  -->
