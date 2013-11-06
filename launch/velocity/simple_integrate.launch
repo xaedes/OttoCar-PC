@@ -5,7 +5,7 @@
 
         <include file="$(find ottocar_utils)/../../launch/remove_gravity/default.launch" unless="$(has_param dont_include_default)"/>
         
-
+        <!-- integrate accelerometer data to get velocity -->
         <node pkg="ottocar_navigation" name="$(anon calc_veloc)" type="calc_veloc.py" output="screen" />
 
         <group if="$(has_param /viz)">
