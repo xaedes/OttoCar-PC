@@ -52,7 +52,6 @@ class Node(object):
         self.publish_rate = publish_rate
         self.update_interval = update_interval
         self.gain = gain
-        rospy.init_node(basename(__file__).replace('.','_'))
         self.measure = MeasureSampleRate(update_interval= self.update_interval, gain=self.gain)
 
         # topic_type = rospy.get_param('~topic_type', False);
@@ -86,6 +85,7 @@ class Node(object):
 __all__ = ['MeasureSampleRate']
 
 if __name__ == '__main__':
+    rospy.init_node(basename(__file__).replace('.','_'))
     Node(publish_rate=rospy.get_param('~publish_rate', False),
         update_interval=rospy.get_param('~update_interval', 10),
         gain=rospy.get_param('~gain', 0.5))
