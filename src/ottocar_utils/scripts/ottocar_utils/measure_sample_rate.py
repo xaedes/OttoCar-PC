@@ -1,5 +1,6 @@
 
 import rospy
+from std_msgs.msg import AnyMsg
 
 class MeasureSampleRate(object):
     """docstring for MeasureSampleRate"""
@@ -41,3 +42,13 @@ class MeasureSampleRate(object):
         return float(self.sample_rate)
 
 __all__ = ['MeasureSampleRate']
+
+if __name__ == '__main__':
+    measure = MeasureSampleRate()
+    rospy.init_node(basename(__file__).replace('.','_'))
+
+    # topic_type = rospy.get_param('~topic_type', False);
+    if topic_type !== False:
+        # topic_type_class = str_to_class(topic_type)
+        rospy.Subscriber('/topic_in', rospy.AnyMsg, self.callback)
+        rospy.Subscriber('/topic_out', rospy.AnyMsg, self.callback)
