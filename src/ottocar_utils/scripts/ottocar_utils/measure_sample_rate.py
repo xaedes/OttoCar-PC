@@ -1,6 +1,8 @@
-
+#!/usr/bin/env python
 import rospy
-from std_msgs.msg import AnyMsg
+from rospy import AnyMsg
+from std_msgs.msg import Float32
+from os.path import basename
 
 class MeasureSampleRate(object):
     """docstring for MeasureSampleRate"""
@@ -41,14 +43,49 @@ class MeasureSampleRate(object):
     def __float__(self):
         return float(self.sample_rate)
 
+class Node(object):
+    """docstring for Node"""
+    def __init__(self, topic_in='/topic_in', topic_out='/topic_out', publish_rate=False, update_interval=10, gain=0.5):
+        super(Node, self).__init__()
+        self.topic_in = topic_in
+        self.topic_out = topic_out
+        self.publish_rate = publish_rate
+        self.update_interval = update_interval
+        self.gain = gain
+        rospy.init_node(basename(__file__).replace('.','_'))
+        self.measure = MeasureSampleRate(update_interval= self.update_interval, gain=self.gain)
+
+        # topic_type = rospy.get_param('~topic_type', False);
+        # if topic_type != False:
+            # topic_type_class = str_to_class(topic_type)
+        
+
+        self.pub = rospy.Publisher(self.topic_out, Float32)
+        
+        self.publish_rate = publish_rate
+        
+        if self.publish_rate == False:
+            rospy.Subscriber(self.topic_in, AnyMsg, self.callback_immediate_publish)
+            rospy.spin()
+            
+        elif isinstance(self.publish_rate, (int, long, float)):
+            rospy.Subscriber(self.topic_in, AnyMsg, self.callback_publish_later)
+            self._r = rospy.Rate(self.publish_rate) 
+            while not rospy.is_shutdown():
+                self.pub.publish(Float32(data=self.measure.sample_rate))
+                self._r.sleep()
+
+    def callback_immediate_publish(self, msg):
+        self.measure.add_sample()
+        self.pub.publish(Float32(data=self.measure.sample_rate))
+        
+
+    def callback_publish_later(self, msg):
+        self.measure.add_sample()
+            
 __all__ = ['MeasureSampleRate']
 
 if __name__ == '__main__':
-    measure = MeasureSampleRate()
-    rospy.init_node(basename(__file__).replace('.','_'))
-
-    # topic_type = rospy.get_param('~topic_type', False);
-    if topic_type !== False:
-        # topic_type_class = str_to_class(topic_type)
-        rospy.Subscriber('/topic_in', rospy.AnyMsg, self.callback)
-        rospy.Subscriber('/topic_out', rospy.AnyMsg, self.callback)
+    Node(publish_rate=rospy.get_param('~publish_rate', False),
+        update_interval=rospy.get_param('~update_interval', 10),
+        gain=rospy.get_param('~gain', 0.5))
