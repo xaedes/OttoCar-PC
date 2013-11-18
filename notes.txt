@@ -1,0 +1,79 @@
+
+Reale Daten
+
+ roslaunch launch/imu/default.launch
+
+Orientierung (funktioniert grob, aber nicht gut genug ohne weitere Daten)
+
+ roslaunch launch/orientation/default.launch
+ rosrun rviz rviz -d ~/.rviz/orientierung.rviz
+
+
+
+Synthetische Daten
+Kreisbahn, Geschwindigkeit wird langsam bis zu einem Maximum erhöht
+
+ roslaunch launch/synth/circular.launch
+
+Orientierung
+ rosrun rviz rviz -d ~/.rviz/orientierung.rviz
+
+
+= Notizen =
+
+Hypothese Normalverteilung
+Testen
+chi²-Test
+André, Numpy - Verteilungstests (gibts auch was auf seiner Website)
+
+
+Grundlagen wie funktioniert die IMU
+Messverfahren
+
+Sensorcharakteristiken
+
+Frequenzgang
+
+Wie funktioniert Madgwick
+
+Histogram wie rqt_plot
+Statistische Signifikanz
+
+
+
+
+Verschiedene Filtermethoden für IMU
+* Kalman
+* Partikel
+* Monte-Carlo
+
+== Evaluation == 
+Testaufbau erklären
+Testfahrten
+
+Kamerapositionsbestimmung ist nicht absoilut genau
+
+Synthethische Daten - (mit Rauschen)
+
+mit Katana Roboterarm
+
+Unterschiedliche Autos
+
+
+
+Schichten:
+IMU
+weitere Daten
+evt. später vis. Odometrie
+
+= Expose =
+10 Minuten
+Erklären was ich eigentlich mache
+Groben Leitfaden zeigen
+
+Botschaft
+ich weiß was er machen will
+ich weiß wie er es machen will
+ich weiß mit welchem Zeitplan
+
+
