@@ -1,11 +1,5 @@
 #!/usr/bin/env python
 
-import pygame
-import signal
-
-import math
-import sys
-
 from os.path import basename
 
 import rospy
@@ -20,11 +14,8 @@ class Node(object):
         super(Node, self).__init__()
         rospy.init_node(basename(__file__).replace('.','_'))
 
-        signal.signal(signal.SIGINT, self.keyboard_interupt)  
 
         self.imu_data = Imu()
-        self.gravity = Vector3(0,0,9.81)
-
         self.high_pass = Vector3()
 
         rospy.Subscriber('/imu/data', Imu, self.callback_imu)
@@ -44,8 +35,6 @@ class Node(object):
 
         self.pub_imu.publish(self.imu_data)
         
-    def keyboard_interupt(self, signum, frame):
-        sys.exit()
 
 
 if __name__ == '__main__':
