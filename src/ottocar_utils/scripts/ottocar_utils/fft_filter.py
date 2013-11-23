@@ -13,7 +13,6 @@ from os.path import basename
 import numpy as np
 
 class Filter(object):
-    """docstring for Filter"""
     def __init__(self):
         super(Filter, self).__init__()
 
@@ -24,7 +23,6 @@ class Filter(object):
         return False
 
 class WindowedFilter(Filter):
-    """docstring for WindowedFilter"""
     def __init__(self, window):
         super(WindowedFilter, self).__init__()
 
@@ -38,21 +36,15 @@ class WindowedFilter(Filter):
         return self.filtered[-1,:]
 
 class FFTFilter(WindowedFilter):
-    """docstring for FFTFilter"""
     def __init__(self, window):
         super(FFTFilter, self).__init__(window)
         self.filter = self._pass
 
     def _sharp_cutoff_at(self, _cutoff, _fft, _freqs):
-        print _cutoff, abs(_freqs) 
-        print (abs(_freqs) <= _cutoff)
-        _fft[abs(_freqs) <= _cutoff,:] = 0
+        _fft[abs(_freqs) <= _cutoff,:] = 0 
 
     def sharp_cutoff_at(self, cutoff):
-        print cutoff
         return lambda self,_fft, _freqs: self._sharp_cutoff_at(_cutoff=cutoff,_fft=_fft, _freqs=_freqs)
-        # partial(self._sharp_cutoff_at, _cutoff=cutoff)
-        # return partial(self._sharp_cutoff_at, _cutoff=cutoff)
 
     def _pass(self, _fft, _freqs):
         pass
@@ -71,29 +63,13 @@ class FFTFilter(WindowedFilter):
     def update(self):
         self._fft = np.fft.fft(self.window.window(),axis=0)
         freqs = self.freqs()
-        # print np.real(_fft[:,0])
 
-        # print self.filter
         self.filter(self,self._fft, freqs)
-
-        # _fft[abs(freqs) < self.cutoff,:] = 0
-
-        # print abs(freqs) < self.cutoff
-        # _fft[np.logical_and(freqs >= 0, freqs < self.cutoff),:] = 0
-        # _fft[:,:] = 10
-        # print np.logical_and((freqs >= 0), (freqs < self.cutoff))
-        # print np.real(_fft[:,0])
-
-
-        # self.sparks = ""
-        # for i in xrange(_fft.shape[1]):
-            # self.sparks += str(i) + ", " + spark.getSparks( abs(np.hstack([np.real(np.fft.fftshift(_fft)[:,i]),[50]]) ) ) + "\n"
 
         self.filtered = np.real(np.fft.ifft(self._fft,axis=0))
 
 
 class Node(object):
-    """docstring for Node"""
     def __init__(self, topic_in='/topic_in', topic_out='/topic_out', publish_callback=False,
                 topic_type='Vector3', window_size=10, 
                 filter_name = "sharp_cutoff_at", filter_arg_0 = 0,
@@ -132,37 +108,32 @@ class Node(object):
         })
 
 
-        # if topic_type != False:
-        # print globals()
-
+        # get class from topic_type
         if self.topic_type in globals():
             self.topic_type_class = globals()[self.topic_type]
-        # print self.topic_type_class
-        # self.topic_type_class = str_to_class(self.topic_type)
+
+        # if topic_type is implemented
         if self.topic_type_class in self.types:
-            # _n_signals = 0
+            # get info for topic_type
             info = self.types[self.topic_type_class]
-            # for (_type, info) in self.types.iteritems():
-                # if isinstance(self.topic_type_class, (_type)):
             _n_signals = info["n_signals"]
 
-
+            # initialize window and fft_filter
             self.window = Window(window_size=self.window_size, n_signals=_n_signals)
             self.fft_filter = FFTFilter(self.window)
-            if self.filter_name == "sharp_cutoff_at":
-                # print "spfjodfsg", self.filter_arg_0
-                self.fft_filter.filter = self.fft_filter.sharp_cutoff_at(self.filter_arg_0)
-                # print self.fft_filter.filter
-                # help(self.fft_filter.filter)
-                # self.fft_filter.filter()
 
+            # set specific fft_filter
+            if self.filter_name == "sharp_cutoff_at":
+                self.fft_filter.filter = self.fft_filter.sharp_cutoff_at(self.filter_arg_0)
+
+            # if results shall be published, set up publisher
             if isinstance(self.topic_out, (str)):
                 self.pub = rospy.Publisher(self.topic_out, self.topic_type_class)
 
-                if self.publish_callback == False:
-                    self.publish = self._publish
-                else:
-                    self.publish = self.publish_callback
+            if self.publish_callback == False:
+                self.publish = self._publish
+            else:
+                self.publish = self.publish_callback
 
 
             rospy.Subscriber(self.topic_in, self.topic_type_class, self.callback)
@@ -174,10 +145,8 @@ class Node(object):
     def callback(self, msg):
         self.measure.add_sample()
 
-        # for (_type, info) in self.types.iteritems():
         if self.topic_type_class in self.types:
             info = self.types[self.topic_type_class]
-            # if isinstance(self.topic_type_class, (_type)):
             self.window.add_sample(info["select_signals"](msg));
     
             if self.window.is_full():
@@ -185,12 +154,6 @@ class Node(object):
                 filtered = self.fft_filter.get()
 
                 self.publish(info["publish"](filtered))
-                # self.pub.publish(Vector3(filtered[0],filtered[1],filtered[2]))
-                
-                # break
-
-        # self.measure.sample_rate
-        # self.pub.publish(Float32(data=self.measure.sample_rate))
         
             
 __all__ = ['MeasureSampleRate']
