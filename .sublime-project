@@ -20,7 +20,8 @@
             // "F" : Fatal for errors which prevented further processing
             // "ignore": [],
             // a list of strings of individual errors to disable, ex: ["C0301"]
-            "disable": ["F0401","E0611" // pylint can not import custom ros packages
+            "disable": ["I0011",        // outline of locally disabled pylints
+                        "F0401","E0611" // pylint can not import custom ros packages
                         ]            
         }
     }
