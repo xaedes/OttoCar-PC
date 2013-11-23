@@ -3,3 +3,4 @@
 /install/
 *.pyc
 /src/roslaunch
+.sublime-project.sublime-workspace
