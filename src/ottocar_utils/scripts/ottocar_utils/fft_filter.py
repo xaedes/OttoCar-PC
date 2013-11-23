@@ -1,22 +1,21 @@
 #!/usr/bin/env python
 import rospy
-from rospy import AnyMsg
 # import ottocar_utils.Window
 from ottocar_utils.window import Window
-from ottocar_utils.str_to_class import str_to_class
 from ottocar_utils.measure_sample_rate import MeasureSampleRate
-from std_msgs.msg import *
-from geometry_msgs.msg import *
-from functools import partial
 from os.path import basename
 
 import numpy as np
+
+from std_msgs.msg import Float32 
+from geometry_msgs.msg import Vector3, Vector3Stamped
+
 
 class Filter(object):
     def __init__(self):
         super(Filter, self).__init__()
 
-    def update(self, sample):
+    def update(self):
         pass
 
     def get(self):
@@ -29,7 +28,7 @@ class WindowedFilter(Filter):
         self.window = window
         self.filtered = window.window()[:,:]
 
-    def update(self, sample):
+    def update(self):
         pass
 
     def get(self):
@@ -39,6 +38,8 @@ class FFTFilter(WindowedFilter):
     def __init__(self, window):
         super(FFTFilter, self).__init__(window)
         self.filter = self._pass
+        self._freqs = None
+        self._fft = None
 
     def _sharp_cutoff_at(self, _cutoff, _fft, _freqs):
         _fft[abs(_freqs) <= _cutoff,:] = 0 
@@ -147,7 +148,7 @@ class Node(object):
 
         if self.topic_type_class in self.types:
             info = self.types[self.topic_type_class]
-            self.window.add_sample(info["select_signals"](msg));
+            self.window.add_sample(info["select_signals"](msg))
     
             if self.window.is_full():
                 self.fft_filter.update()
