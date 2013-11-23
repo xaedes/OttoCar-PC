@@ -1,0 +1,27 @@
+{
+	"folders":
+	[
+		{
+			"follow_symlinks": true,
+			"path": "~/rosws"
+		}
+	],
+    "settings":
+    {
+        "pylinter":
+        {
+            // Optionally set the working directory
+            "working_dir": "/home/viki/rosws",
+            // Ignore Pylint error types. Possible values:
+            // "R" : Refactor for a "good practice" metric violation
+            // "C" : Convention for coding standard violation
+            // "W" : Warning for stylistic problems, or minor programming issues
+            // "E" : Error for important programming issues (i.e. most probably bug)
+            // "F" : Fatal for errors which prevented further processing
+            // "ignore": [],
+            // a list of strings of individual errors to disable, ex: ["C0301"]
+            "disable": ["F0401","E0611" // pylint can not import custom ros packages
+                        ]            
+        }
+    }
+}
