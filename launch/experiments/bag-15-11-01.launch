@@ -1,0 +1,14 @@
+<launch>
+    <param name="/dont_include_default" value="true" />
+    <include file="$(find ottocar_utils)/../../launch/remove_gravity/with_highpass.launch" />
+    <node pkg="ottocar_navigation" type="simple_integrate.py" name="$(anon veloc)">
+        <remap from="/topic_in" to="/accelerometer/high_pass" />
+        <remap from="/topic_out" to="/veloc" />
+    </node>
+    <node pkg="ottocar_navigation" type="simple_integrate.py" name="$(anon pos)">
+        <remap from="/topic_in" to="/veloc" />
+        <remap from="/topic_out" to="/pos" />
+    </node>
+    <node pkg="ottocar_utils" name="$(anon bag)" type="exec.sh"
+          args="rosbag play '$(find ottocar_utils)/../../bags/testlauf 01 - 15.11.2013/run-01-2013-11-15-18-08-36.bag'" />
+</launch>
