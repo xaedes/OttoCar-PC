@@ -156,9 +156,6 @@ class Node(object):
 
                 self.publish(info["publish"](filtered))
         
-            
-__all__ = ['MeasureSampleRate']
-
 if __name__ == '__main__':
     rospy.init_node(basename(__file__).replace('.','_'))
     Node(topic_type=rospy.get_param('~topic_type', 'Vector3'),
