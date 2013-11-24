@@ -1,19 +1,13 @@
 #!/usr/bin/env python
 
-import pygame
-from time import sleep
 import signal
 
 import sys
-import math
 
 from os.path import basename
 
 import rospy
-from geometry_msgs.msg import Pose
 from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import Quaternion
-from geometry_msgs.msg import Vector3
 from geometry_msgs.msg import Vector3Stamped
 from sensor_msgs.msg import Imu
 
@@ -58,7 +52,7 @@ class Node(object):
         self.velocity = data
 
         # transform self.velocity into global frame
-        global_velocity = QuaternionAlg(self.imu_data.orientation).rotate_vector3(self.velocity.vector)
+        global_velocity = QuaternionAlg(self.imu_data.orientation).rotate_vector3(self.velocity.vector) # pylint: disable=E1103
 
         self.pose.header = self.imu_data.header
         self.pose.pose.orientation = self.imu_data.orientation
