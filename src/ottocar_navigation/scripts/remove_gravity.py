@@ -1,18 +1,12 @@
 #!/usr/bin/env python
 
-import pygame
-from time import sleep
 import signal
 
-import math
 import sys
 
 from os.path import basename
 
 import rospy
-from geometry_msgs.msg import Pose
-from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import Quaternion
 from geometry_msgs.msg import Vector3
 from sensor_msgs.msg import Imu
 
