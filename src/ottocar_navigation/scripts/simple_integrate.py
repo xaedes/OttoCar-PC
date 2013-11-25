@@ -86,7 +86,6 @@ class Node(object):
 
             dtime = time - self.last_time
 
-            # print np.array(info["select_signals"](msg)) * dtime
             self.integrated += np.array(info["select_signals"](msg)) * dtime
 
             self.last_time = time
