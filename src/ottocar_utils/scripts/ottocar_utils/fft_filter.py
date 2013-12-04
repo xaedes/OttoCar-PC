@@ -41,11 +41,17 @@ class FFTFilter(WindowedFilter):
         self._freqs = None
         self._fft = None
 
-    def _sharp_cutoff_at(self, _cutoff, _fft, _freqs):
+    def _high_pass_sharp_cutoff_at(self, _cutoff, _fft, _freqs):
         _fft[abs(_freqs) <= _cutoff,:] = 0 
 
-    def sharp_cutoff_at(self, cutoff):
-        return lambda self,_fft, _freqs: self._sharp_cutoff_at(_cutoff=cutoff,_fft=_fft, _freqs=_freqs)
+    def high_pass_sharp_cutoff_at(self, cutoff):
+        return lambda self,_fft, _freqs: self._high_pass_sharp_cutoff_at(_cutoff=cutoff,_fft=_fft, _freqs=_freqs)
+
+    def _low_pass_sharp_cutoff_at(self, _cutoff, _fft, _freqs):
+        _fft[abs(_freqs) > _cutoff,:] = 0 
+
+    def low_pass_sharp_cutoff_at(self, cutoff):
+        return lambda self,_fft, _freqs: self._low_pass_sharp_cutoff_at(_cutoff=cutoff,_fft=_fft, _freqs=_freqs)
 
     def _pass(self, _fft, _freqs):
         pass
@@ -73,7 +79,7 @@ class FFTFilter(WindowedFilter):
 class Node(object):
     def __init__(self, topic_in='/topic_in', topic_out='/topic_out', publish_callback=False,
                 topic_type='Vector3', window_size=10, 
-                filter_name = "sharp_cutoff_at", filter_arg_0 = 0,
+                filter_name = "high_pass_sharp_cutoff_at", filter_arg_0 = 0,
                 measure_sample_rate_update_interval=10, measure_sample_rate_gain=0.5):
         super(Node, self).__init__() 
         self.topic_in = topic_in
@@ -124,8 +130,10 @@ class Node(object):
             self.fft_filter = FFTFilter(self.window)
 
             # set specific fft_filter
-            if self.filter_name == "sharp_cutoff_at":
-                self.fft_filter.filter = self.fft_filter.sharp_cutoff_at(self.filter_arg_0)
+            if self.filter_name == "high_pass_sharp_cutoff_at":
+                self.fft_filter.filter = self.fft_filter.high_pass_sharp_cutoff_at(self.filter_arg_0)
+            elif self.filter_name == "low_pass_sharp_cutoff_at":
+                self.fft_filter.filter = self.fft_filter.low_pass_sharp_cutoff_at(self.filter_arg_0)
 
             # if results shall be published, set up publisher
             if isinstance(self.topic_out, (str)):
@@ -160,6 +168,6 @@ if __name__ == '__main__':
     rospy.init_node(basename(__file__).replace('.','_'))
     Node(topic_type=rospy.get_param('~topic_type', 'Vector3'),
         window_size = rospy.get_param('~window_size',10),
-        filter_name = rospy.get_param('~filter', 'sharp_cutoff_at'), filter_arg_0 = rospy.get_param('~filter_arg_0', 0),
+        filter_name = rospy.get_param('~filter', 'high_pass_sharp_cutoff_at'), filter_arg_0 = rospy.get_param('~filter_arg_0', 0),
         measure_sample_rate_update_interval=rospy.get_param('~measure_sample_rate_update_interval', 10),
         measure_sample_rate_gain=rospy.get_param('~measure_sample_rate_gain', 0.5))
