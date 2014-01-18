@@ -1,0 +1,253 @@
+{
+  "keys": {}, 
+  "groups": {
+    "pluginmanager": {
+      "keys": {
+        "running-plugins": {
+          "type": "repr", 
+          "repr": "{u'rqt_plot/Plot': [4, 3, 1, 2], u'rqt_image_view/ImageView': [1]}"
+        }
+      }, 
+      "groups": {
+        "plugin__rqt_image_view__ImageView__1": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "dynamic_range": {
+                  "type": "repr", 
+                  "repr": "False"
+                }, 
+                "max_range": {
+                  "type": "repr", 
+                  "repr": "10.0"
+                }, 
+                "topic": {
+                  "type": "repr", 
+                  "repr": "u'/camera/image_raw'"
+                }, 
+                "zoom1": {
+                  "type": "repr", 
+                  "repr": "False"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__1": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "2"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "[u'/imu/data_raw/linear_acceleration/z', u'/imu/data_raw/linear_acceleration/y', u'/imu/data_raw/linear_acceleration/x']"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__2": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "2"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "[u'/imu/mag/vector/x', u'/imu/mag/vector/y', u'/imu/mag/vector/z']"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__3": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "2"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "[u'/imu/data_raw/angular_velocity/x', u'/imu/data_raw/angular_velocity/y', u'/imu/data_raw/angular_velocity/z']"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_plot__Plot__4": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__DataPlotWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "plot_type": {
+                  "type": "repr", 
+                  "repr": "2"
+                }, 
+                "topics": {
+                  "type": "repr", 
+                  "repr": "[u'/angle_cmd/data', u'/speed_cmd/data']"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_graph__RosGraph__1": {
+          "keys": {}, 
+          "groups": {
+            "plugin": {
+              "keys": {
+                "graph_type_combo_box_index": {
+                  "type": "repr", 
+                  "repr": "u'0'"
+                }, 
+                "topic_filter_line_edit_text": {
+                  "type": "repr", 
+                  "repr": "u'/'"
+                }, 
+                "filter_line_edit_text": {
+                  "type": "repr", 
+                  "repr": "u'/'"
+                }, 
+                "highlight_connections_check_box_state": {
+                  "type": "repr", 
+                  "repr": "u'true'"
+                }, 
+                "actionlib_check_box_state": {
+                  "type": "repr", 
+                  "repr": "u'true'"
+                }, 
+                "quiet_check_box_state": {
+                  "type": "repr", 
+                  "repr": "u'true'"
+                }, 
+                "dead_sinks_check_box_state": {
+                  "type": "repr", 
+                  "repr": "u'true'"
+                }, 
+                "leaf_topics_check_box_state": {
+                  "type": "repr", 
+                  "repr": "u'true'"
+                }, 
+                "namespace_cluster_check_box_state": {
+                  "type": "repr", 
+                  "repr": "u'true'"
+                }, 
+                "auto_fit_graph_check_box_state": {
+                  "type": "repr", 
+                  "repr": "u'true'"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }
+      }
+    }, 
+    "mainwindow": {
+      "keys": {
+        "geometry": {
+          "type": "repr(QByteArray.hex)", 
+          "repr(QByteArray.hex)": "QtCore.QByteArray('01d9d0cb000100000000000000000018000005590000030700000002000000310000055700000305000000000000')", 
+          "pretty-print": "         Y     1 W     "
+        }, 
+        "state": {
+          "type": "repr(QByteArray.hex)", 
+          "repr(QByteArray.hex)": "QtCore.QByteArray('000000ff00000000fd000000010000000300000556000002a6fc0100000003fc00000000000001f50000011500fffffffc0200000002fb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0031005f005f00440061007400610050006c006f00740057006900640067006500740100000019000001500000015000fffffffc0000016f00000150000001170100001dfa000000010100000002fb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0033005f005f00440061007400610050006c006f00740057006900640067006500740100000000ffffffff0000011500fffffffb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0032005f005f00440061007400610050006c006f00740057006900640067006500740100000000000002a80000011500fffffffb00000044007200710074005f00670072006100700068005f005f0052006f007300470072006100700068005f005f0031005f005f0052006f007300470072006100700068005500690100000000000005560000000000000000fc000001fb0000035b0000011500fffffffc0200000002fb00000042007200710074005f0070006c006f0074005f005f0050006c006f0074005f005f0034005f005f00440061007400610050006c006f00740057006900640067006500740100000019000000f9000000f900fffffffb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0031005f005f0049006d00610067006500560069006500770057006900640067006500740100000118000001a70000005100ffffff000005560000000000000004000000040000000800000008fc00000001000000030000000100000036004d0069006e0069006d0069007a006500640044006f0063006b00570069006400670065007400730054006f006f006c0062006100720000000000ffffffff0000000000000000')", 
+          "pretty-print": "                                                                  P P                 Brqt_plot__Plot__3__DataPlotWidget          Brqt_plot__Plot__2__DataPlotWidget          Drqt_graph__RosGraph__1__RosGraphUi            [                                                                                                        Q   V                                                      "
+        }
+      }, 
+      "groups": {
+        "toolbar_areas": {
+          "keys": {
+            "MinimizedDockWidgetsToolbar": {
+              "type": "repr", 
+              "repr": "8"
+            }
+          }, 
+          "groups": {}
+        }
+      }
+    }
+  }
+}
