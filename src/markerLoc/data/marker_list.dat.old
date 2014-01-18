@@ -1,0 +1,38 @@
+#the number of patterns to be recognized
+2
+
+#pattern 1
+#roof11
+#../../../../../../../../../../../../../home/adietric/Workspace/ROS/markerLoc/data/11.patt
+#280.0
+#0.0 0.0
+
+#pattern 2
+#roof22
+#../../../../../../../../../../../../../home/adietric/Workspace/ROS/markerLoc/data/22.patt
+#280.0
+#0.0 0.0
+
+#pattern 3
+#roof33
+#../../../../../../../../../../../../../home/adietric/Workspace/ROS/markerLoc/data/33.patt
+#280.0
+#0.0 0.0
+
+#pattern 4
+#roof44
+#../../../../../../../../../../../../../home/adietric/Workspace/ROS/markerLoc/data/44.patt
+#280.0
+#0.0 0.0
+
+#pattern 5
+ottocar
+../../markerLoc/data/59.patt
+100.0
+0.0 0.0
+
+#pattern 6
+youbot
+../../markerLoc/data/63.patt
+200.0
+0.0 0.0

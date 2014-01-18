@@ -1,0 +1,20 @@
+image_width: 800
+image_height: 600
+camera_name: foobar
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [824.606211, 0.000000, 467.126846, 0.000000, 826.239686, 352.556839, 0.000000, 0.000000, 1.000000]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.106452, -0.338075, 0.001113, 0.003153, 0.348926]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [852.982523, 0.000000, 479.500000, 0.000000, 0.000000, 854.672209, 359.500000, 0.000000, 0.000000, 0.000000, 1.000000, 0.000000]

@@ -1,0 +1,53 @@
+<launch>
+
+	<!--node pkg="tf" type="static_transform_publisher" name="world_to_cam" args="0 0 0.5 -1.57 0 -1.57 world camera 1" /-->
+	
+	<node name="usb_cam" pkg="usb_cam" type="usb_cam_node" respawn="false" output="log">
+		<param name="video_device" type="string" value="/dev/video1"/>
+		<param name="camera_frame_id" type="string" value="usb_cam"/>
+		<param name="io_method" type="string" value="mmap"/>
+		<param name="image_width" type="int" value="960"/>
+		<param name="image_height" type="int" value="720"/>
+		<param name="pixel_format" type="string" value="yuyv"/>
+		<rosparam param="D">[0.106452, -0.338075, 0.001113, 0.003153, 0.348926]</rosparam>
+		<rosparam param="K">[824.606211, 0.000000, 467.126846, 0.000000, 826.239686, 352.556839, 0.000000, 0.000000, 1.000000]</rosparam>
+		<rosparam param="R">[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]</rosparam>
+		<rosparam param="P">[852.982523, 0.000000, 479.500000, 0.000000, 0.000000, 854.672209, 359.500000, 0.000000, 0.000000, 0.000000, 1.000000, 0.000000]</rosparam>
+	
+		<remap from="usb_cam/image_raw" to="camera/image_raw" />
+		<remap from="usb_cam/camera_info" to="camera/camera_info" />
+	</node>
+	
+	<!--node name="ar_pose" pkg="ar_pose" type="ar_single" respawn="false" output="screen">
+		<param name="marker_pattern" type="string" value="$(find ar_pose)/data/world.patt"/>
+		<param name="marker_width" type="double" value="280.00"/>
+		<param name="marker_center_x" type="double" value="0.0"/>
+		<param name="marker_center_y" type="double" value="0.0"/>
+		<param name="threshold" type="int" value="100"/>
+		<param name="use_history" type="bool" value="true"/>
+	</node-->
+  
+	<node name="image_view" pkg="image_view" type="image_view" args="image:=/camera/image_raw" />
+	
+	
+	
+	<node pkg="tf" type="static_transform_publisher" name="world_to_marker" args="0 0 0 -1.57 3.14 -1.57 world ar_marker 10" />
+
+	<!--node name="ar_pose_single" pkg="ar_pose" type="ar_single" respawn="false" output="screen">
+		<param name="marker_pattern"		type="string"	value="$(find markerLoc)/data/world.patt"/>
+		<param name="marker_width"		type="double"	value="160.0"/>
+		<param name="marker_center_x"		type="double"	value="0.0"/>
+		<param name="marker_center_y"		type="double"	value="0.0"/>
+		<param name="threshold"			type="int"	value="110"/>
+		<param name="use_history"		type="int"	value="1"/>
+		<param name="reverse_transform"		type="bool"	value="true"/>
+	</node-->
+	
+	<node name="ar_pose_multi" pkg="ar_pose" type="ar_multi" respawn="false" output="screen">
+		<param name="marker_pattern_list" 	type="string"	value="$(find markerLoc)/marker/marker_list.dat"/>
+		<param name="threshold" 		type="int" 	value="100"/>
+		<param name="use_history"		type="int"	value="1"/>
+		<param name="image_topic"		type="string"	value="/usb_cam/image_raw"/>
+		<param name="image_info"		type="string"	value="/usb_cam/camera_info"/>
+	</node>
+</launch>

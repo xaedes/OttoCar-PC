@@ -1,0 +1,19 @@
+<package>
+  <description brief="markerLoc">
+
+     markerLoc
+
+  </description>
+  <author>andre</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/markerLoc</url>
+  <depend package="usb_cam"/>
+  <depend package="tf"/>
+  <depend package="ar_pose"/>
+  <depend package="artoolkit"/>
+  <depend package="image_view"/>
+
+</package>
+
+
