@@ -77,14 +77,17 @@ class Node(object):
             return Node.rescale(value,to_absmin_positive,to_absmax_positive,from_min = 0,from_max = 1)
 
     def angle_cmd(self, value):
-        # value = self.rescale(value,270,450)
-        value = self.axis_rescale(value,270,375,375,450)
-        self.pub_angle.publish(Int16(data=int(value)))
+       # value = self.rescale(value,270,450)
+        value = self.axis_rescale(value,-128,0,0,127)
+        self.pub_angle.publish(Int8(data=int(value)))
         print 'angle: ', value
 
     def speed_cmd(self, value):
-        value = self.axis_rescale(value,-20,0,10,50)      
-        # value = self.rescale(value,-20,20)      # moderate speed
+        #value = self.axis_rescale(value,-20,0,10,20)   # slow/moderate      
+        value = self.axis_rescale(value,-60,0,10,60)   # moderate    
+        #value = self.axis_rescale(value,-127,0,10,127) # warp 10     
+        
+	# value = self.rescale(value,-20,20)      # moderate speed
         # value = self.rescale(value,-127,127)  # maximum speed
         self.pub_speed.publish(Int8(data=int(value)))
         print 'speed: ', value
@@ -99,6 +102,7 @@ class Node(object):
         if abs(speed) < 6:
             speed = 0
 
+
         print 'speed: ', speed
         
         # self.pub_speed.publish(Int8(data=int(10)))
@@ -109,12 +113,18 @@ class Node(object):
         self.pub_speed.publish(Int8(data=int(self.accelctrl.speed)))
 
     def update(self):
-        if self.joystick.get_button( 2 ) == 1:
-            self.brake_to_zero()
-        else:
-            self.accelerate_cmd( -self.joystick.get_axis( 1 ))
-        # self.speed_cmd( -self.joystick.get_axis( 1 ))
-        self.angle_cmd( self.joystick.get_axis( 3 ))
+        if self.joystick.get_button( 3 ) == 1:
+            self.pause = True
+        if self.joystick.get_button( 1 ) == 1:
+            self.pause = False
+
+        if not self.pause:
+            if self.joystick.get_button( 2 ) == 1:
+                self.brake_to_zero()
+            else:
+                self.accelerate_cmd( self.joystick.get_axis( 1 ))
+                # self.speed_cmd( self.joystick.get_axis( 1 ))
+            self.angle_cmd( self.joystick.get_axis( 3 ))
         
 
     def keyboard_interupt(self, signum, frame):
@@ -122,13 +132,13 @@ class Node(object):
         print " closing..."
 
     def spin(self):
+        r = rospy.Rate(10) # 10hz
         while(self.run):
             # pygame events must be processed to get current values for joystick (happens in the background)
             pygame.event.pump()
 
-
             self.update()
-            sleep(0.1)      
+            r.sleep()
 
         # rospy.spin() 
 
@@ -171,6 +181,7 @@ class Node(object):
         super(Node, self).__init__()
 
         self.run = True
+        self.pause = False
         signal.signal(signal.SIGINT, self.keyboard_interupt)  
 
 
@@ -180,16 +191,24 @@ class Node(object):
             rospy.init_node('joystick')
 
             # publisher for messages
-            self.pub_angle = rospy.Publisher('angle_cmd', Int16)
-            self.pub_speed = rospy.Publisher('speed_cmd', Int8)
+            self.pub_angle = rospy.Publisher('angle_cmd', Int8, tcp_nodelay=True)
+            self.pub_speed = rospy.Publisher('speed_cmd', Int8, tcp_nodelay=True)
 
+            
+            speed = 127 # warp 10
+            #speed = 40  # good speed 
+            #speed = 20  # moderate 
+            accel = 20
+            #accel = 40
+
+            brake = accel * 10
             # self.accel = Accelerator(max_acceleration = 1, max_speed=20)
             self.accelctrl = AccelerationCarControl(    #accelerations given in 1/s
-                minimum_speed=-40, maximum_speed=40,
-                max_forward_acceleration=20, 
-                max_forward_brake=40, 
-                max_reverse_acceleration=20, 
-                max_reverse_brake=40)
+                minimum_speed=-speed, maximum_speed=speed,
+                max_forward_acceleration=accel, 
+                max_forward_brake=brake, 
+                max_reverse_acceleration=accel, 
+                max_reverse_brake=brake)
             
             self.spin()
 
