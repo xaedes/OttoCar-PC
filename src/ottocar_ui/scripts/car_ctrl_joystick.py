@@ -28,7 +28,6 @@ class Accelerator(object):
 
     def update(self):
         dtime = self.clock.get_time() / 1000.0  # delta time in seconds
-
         self.speed += dtime * self.acceleration
         self.speed = min(max(self.speed,self.minimum_speed),self.maximum_speed)
 
@@ -94,7 +93,7 @@ class Node(object):
 
     def accelerate_cmd(self, value):
         self.accelctrl.set_axis_value(value)
-        self.accelctrl.update()
+
         speed = self.accelctrl.speed
 
         # motor does not really start when abs(speed) is below a certain value
@@ -110,6 +109,7 @@ class Node(object):
 
     def brake_to_zero(self):
         self.accelctrl.speed = 0
+        self.accelctrl.acceleration = 0
         self.pub_speed.publish(Int8(data=int(self.accelctrl.speed)))
 
     def update(self):
@@ -119,6 +119,8 @@ class Node(object):
             self.pause = False
 
         if not self.pause:
+            self.accelctrl.update()
+
             if self.joystick.get_button( 2 ) == 1:
                 self.brake_to_zero()
             else:
