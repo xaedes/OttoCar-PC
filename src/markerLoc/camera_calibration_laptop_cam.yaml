@@ -1,5 +1,5 @@
-image_width: 1600
-image_height: 1200
+image_width: 160
+image_height: 120
 camera_name: foobar
 camera_matrix:
   rows: 3
