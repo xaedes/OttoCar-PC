@@ -6,9 +6,9 @@
 	<!-- <node pkg="tf" type="static_transform_publisher" name="world_to_marker" args="0 0 0 -1.57 3.14 -1.57 world ar_marker 10" /> -->
 	<node pkg="tf" type="static_transform_publisher" name="ar_to_usb" args="-0.0299068125266 0.33696761584 2.91697196851 0.0106185905856 0.99746900858 -0.0506621935121 0.0487459188477 ar_marker usb_cam 10" />
 
-	<!-- <node name="ar_pose_single" pkg="ar_pose" type="ar_single" respawn="false" output="screen">
+<!-- 	<node name="ar_pose_single" pkg="ar_pose" type="ar_single" respawn="false" output="screen">
 		<param name="marker_pattern"		type="string"	value="$(find markerLoc)/data/0.patt"/>
-		<param name="marker_width"		type="double"	value="280.0"/>
+		<param name="marker_width"		type="double"	value="276.0"/>
 		<param name="marker_center_x"		type="double"	value="0.0"/>
 		<param name="marker_center_y"		type="double"	value="0.0"/>
 		<param name="threshold"			type="int"	value="110"/>
@@ -19,7 +19,8 @@
 	<node name="ar_pose_multi" pkg="ar_pose" type="ar_multi" respawn="false" output="screen">
 		<param name="marker_pattern_list" 	type="string"	value="$(find markerLoc)/data/marker_list.dat"/>
 		<param name="threshold" 		type="int" 	value="100"/>
-		<param name="use_history"		type="int"	value="1"/>
+		<!-- <param name="threshold" 		type="int" 	value="100"/> -->
+		<param name="use_history"		type="bool"	value="true"/>
 	</node>
 	
 	 <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find markerLoc)/launch/markerLoc.rviz"/> -->
