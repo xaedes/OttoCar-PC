@@ -29,7 +29,7 @@ class Kalman(object):
 		# R: Messunsicherheit
 		self.R = np.matrix(np.identity(n_sensors))
 
-		# I: Identity
+		# I: Einheitsmatrix
 		self.I = np.matrix(np.identity(n_states))
 
 		self.first = True
@@ -59,58 +59,72 @@ class Subscriber(object):
 
 		self.dt = dt = 1
 
-		self.kalman = Kalman(n_states = 9, n_sensors = 5)
-		self.kalman.H = np.matrix(	'0 0 0 0 0 0 1 0 0;'	#accel.x
-									'0 0 0 0 0 0 0 1 0;'	#accel.y
-									'0 0 0 0 0 0 0 0 1;'	#accel.z
-									'0 0 0 0 0 1 0 0 0;'	#assume: veloc.z = 0
-									'0 0 1 0 0 0 0 0 0 '	#assume: pos.z = 0
+		#states:
+		# [pos.x,pos.y,pos.z,			0:3
+		#  veloc.x,veloc.y,veloc.z,		3:6
+		#  accel.x,accel.y,accel.z,		6:9
+		#  gyro.x,gyro.y,gyro.z]		9:12
+
+		self.kalman = Kalman(n_states = 12, n_sensors = 5)
+
+
+		# H: Messmatrix
+		self.kalman.H = np.matrix(	'0 0 0 0 0 0 1 0 0 0 0 0;'	#accel.x
+									'0 0 0 0 0 0 0 1 0 0 0 0;'	#accel.y
+									'0 0 0 0 0 0 0 0 1 0 0 0;'	#accel.z
+									'0 0 0 0 0 1 0 0 0 0 0 0;'	#assume: veloc.z = 0
+									'0 0 1 0 0 0 0 0 0 0 0 0;'	#assume: pos.z = 0
+									'0 0 0 0 0 0 0 0 0 0 0 0;'  #assume: gyro.x = 0
+									'0 0 0 0 0 0 0 0 0 0 0 0;'  #assume: gyro.y = 0
 									)
-		self.kalman.F = np.matrix([	[1,0,0,dt,0,0,0,0,0],	#pos.x = pos.x + dt*veloc.x
-									[0,1,0,0,dt,0,0,0,0],	#pos.y = pos.y + dt*veloc.y
-									[0,0,1,0,0,dt,0,0,0],	#pos.y = pos.z + dt*veloc.z
-									[0,0,0,1,0,0,dt,0,0],	#veloc.x = veloc.x + dt*accel.x
-									[0,0,0,0,1,0,0,dt,0],	#veloc.y = veloc.y + dt*accel.y
-									[0,0,0,0,0,1,0,0,dt],	#veloc.z = veloc.z + dt*accel.z
-									[0,0,0,0,0,0,1,0,0],	#accel.x = accel.x
-									[0,0,0,0,0,0,0,1,0],	#accel.y = accel.y
-									[0,0,0,0,0,0,0,0,1] 	#accel.z = accel.z
+		# F: Dynamik
+		self.kalman.F = np.matrix([	[1,0,0,dt,0,0,0,0,0,0,0,0],	#pos.x = pos.x + dt*veloc.x
+									[0,1,0,0,dt,0,0,0,0,0,0,0],	#pos.y = pos.y + dt*veloc.y
+									[0,0,1,0,0,dt,0,0,0,0,0,0],	#pos.y = pos.z + dt*veloc.z
+									[0,0,0,1,0,0,dt,0,0,0,0,0],	#veloc.x = veloc.x + dt*accel.x
+									[0,0,0,0,1,0,0,dt,0,0,0,0],	#veloc.y = veloc.y + dt*accel.y
+									[0,0,0,0,0,1,0,0,dt,0,0,0],	#veloc.z = veloc.z + dt*accel.z
+									[0,0,0,0,0,0,1,0,0,0,0,0],	#accel.x = accel.x
+									[0,0,0,0,0,0,0,1,0,0,0,0],	#accel.y = accel.y
+									[0,0,0,0,0,0,0,0,1,0,0,0], 	#accel.z = accel.z
+									[0,0,0,0,0,0,0,0,0,1,0,0],  #gyro.x = gyro.x
+									[0,0,0,0,0,0,0,0,0,0,1,0],  #gyro.y = gyro.y
+									[0,0,0,0,0,0,0,0,0,0,0,1]   #gyro.z = gyro.z
 									])
 
 
-
-		# self.kalman = Kalman(n_states = 3, n_sensors = 3)
-		# self.kalman.H = np.matrix(	'1 0 0;'
-		# 							'0 1 0;'
-		# 							'0 0 1')
-
+		# P: Unsicherheit über Systemzustand	
 		self.P = 0.1
-
 		self.kalman.P *= self.P
+
+		# R: Messunsicherheit
 		# self.kalman.R *= 1000 ** 3
 		self.kalman.R *= 1
 		# self.kalman.R *= 0.000000000000000000000000000000000000002
 
+		# Publishers
 		self.pub_accel = rospy.Publisher('/accelerometer/kalman', Vector3)
 		self.pub_veloc = rospy.Publisher('/velocity/kalman', Vector3)
 		self.pub_pos = rospy.Publisher('/position/kalman', Vector3)
 		# self.pub_accel_var_min = rospy.Publisher('kalman/accelerometer_var_min', Vector3)
 		# self.pub_accel_var_max = rospy.Publisher('kalman/accelerometer_var_max', Vector3)
 
+		# Subscribers
 		rospy.Subscriber('/accelerometer/calibrated', Vector3, self.callback_accel)
 		rospy.spin()
-		
+
 	def callback_accel(self, data):
 		# print "received data: ", data
-		Z = np.matrix([data.x,data.y,data.z,0,0]).getT()
+		Z = np.matrix([data.x,data.y,data.z,0,0,0,0]).getT()
 
 		if self.kalman.first:
 			# self.kalman.x[3:6,0] = Z
 			self.kalman.first = False
 
+		# P: Unsicherheit über Systemzustand
+		# reset for accel
 		self.kalman.P[6:9,6:9] = np.matrix(np.identity(3)) * self.P
 
-		# print self.kalman.P
 
 		self.kalman.update(Z)
 		self.kalman.predict()
