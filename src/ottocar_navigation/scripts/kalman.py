@@ -63,33 +63,36 @@ class Subscriber(object):
 		# [pos.x,pos.y,pos.z,			0:3
 		#  veloc.x,veloc.y,veloc.z,		3:6
 		#  accel.x,accel.y,accel.z,		6:9
-		#  gyro.x,gyro.y,gyro.z]		9:12
+		#  gyro.x,gyro.y,gyro.z,		9:12
+		#  orientation]					12
+		#
 
 		self.kalman = Kalman(n_states = 12, n_sensors = 5)
 
 
 		# H: Messmatrix
-		self.kalman.H = np.matrix(	'0 0 0 0 0 0 1 0 0 0 0 0;'	#accel.x
-									'0 0 0 0 0 0 0 1 0 0 0 0;'	#accel.y
-									'0 0 0 0 0 0 0 0 1 0 0 0;'	#accel.z
-									'0 0 0 0 0 1 0 0 0 0 0 0;'	#assume: veloc.z = 0
-									'0 0 1 0 0 0 0 0 0 0 0 0;'	#assume: pos.z = 0
-									'0 0 0 0 0 0 0 0 0 0 0 0;'  #assume: gyro.x = 0
-									'0 0 0 0 0 0 0 0 0 0 0 0;'  #assume: gyro.y = 0
+		self.kalman.H = np.matrix(	'0 0 0 0 0 0 1 0 0 0 0 0 0;'	#accel.x
+									'0 0 0 0 0 0 0 1 0 0 0 0 0;'	#accel.y
+									'0 0 0 0 0 0 0 0 1 0 0 0 0;'	#accel.z
+									'0 0 0 0 0 1 0 0 0 0 0 0 0;'	#assume: veloc.z = 0
+									'0 0 1 0 0 0 0 0 0 0 0 0 0;'	#assume: pos.z = 0
+									'0 0 0 0 0 0 0 0 0 0 0 0 0;'  #assume: gyro.x = 0
+									'0 0 0 0 0 0 0 0 0 0 0 0 0;'  #assume: gyro.y = 0
 									)
 		# F: Dynamik
-		self.kalman.F = np.matrix([	[1,0,0,dt,0,0,0,0,0,0,0,0],	#pos.x = pos.x + dt*veloc.x
-									[0,1,0,0,dt,0,0,0,0,0,0,0],	#pos.y = pos.y + dt*veloc.y
-									[0,0,1,0,0,dt,0,0,0,0,0,0],	#pos.y = pos.z + dt*veloc.z
-									[0,0,0,1,0,0,dt,0,0,0,0,0],	#veloc.x = veloc.x + dt*accel.x
-									[0,0,0,0,1,0,0,dt,0,0,0,0],	#veloc.y = veloc.y + dt*accel.y
-									[0,0,0,0,0,1,0,0,dt,0,0,0],	#veloc.z = veloc.z + dt*accel.z
-									[0,0,0,0,0,0,1,0,0,0,0,0],	#accel.x = accel.x
-									[0,0,0,0,0,0,0,1,0,0,0,0],	#accel.y = accel.y
-									[0,0,0,0,0,0,0,0,1,0,0,0], 	#accel.z = accel.z
-									[0,0,0,0,0,0,0,0,0,1,0,0],  #gyro.x = gyro.x
-									[0,0,0,0,0,0,0,0,0,0,1,0],  #gyro.y = gyro.y
-									[0,0,0,0,0,0,0,0,0,0,0,1]   #gyro.z = gyro.z
+		self.kalman.F = np.matrix([	[1,0,0,dt,0,0,0,0,0,0,0,0,0],	#pos.x = pos.x + dt*veloc.x
+									[0,1,0,0,dt,0,0,0,0,0,0,0,0],	#pos.y = pos.y + dt*veloc.y
+									[0,0,1,0,0,dt,0,0,0,0,0,0,0],	#pos.y = pos.z + dt*veloc.z
+									[0,0,0,1,0,0,dt,0,0,0,0,0,0],	#veloc.x = veloc.x + dt*accel.x
+									[0,0,0,0,1,0,0,dt,0,0,0,0,0],	#veloc.y = veloc.y + dt*accel.y
+									[0,0,0,0,0,1,0,0,dt,0,0,0,0],	#veloc.z = veloc.z + dt*accel.z
+									[0,0,0,0,0,0,1,0,0,0,0,0,0],	#accel.x = accel.x
+									[0,0,0,0,0,0,0,1,0,0,0,0,0],	#accel.y = accel.y
+									[0,0,0,0,0,0,0,0,1,0,0,0,0],	#accel.z = accel.z
+									[0,0,0,0,0,0,0,0,0,1,0,0,0],	#gyro.x = gyro.x
+									[0,0,0,0,0,0,0,0,0,0,1,0,0],	#gyro.y = gyro.y
+									[0,0,0,0,0,0,0,0,0,0,0,1,0],	#gyro.z = gyro.z
+									[0,0,0,0,0,0,0,0,0,0,0,dt,1] 	#orientation = orientation + dt*gyro.z
 									])
 
 
