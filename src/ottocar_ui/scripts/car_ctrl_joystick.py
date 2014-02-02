@@ -28,6 +28,7 @@ class Accelerator(object):
 
     def update(self):
         dtime = self.clock.get_time() / 1000.0  # delta time in seconds
+
         self.speed += dtime * self.acceleration
         self.speed = min(max(self.speed,self.minimum_speed),self.maximum_speed)
 
@@ -77,7 +78,7 @@ class Node(object):
 
     def angle_cmd(self, value):
        # value = self.rescale(value,270,450)
-        value = self.axis_rescale(value,-128,0,0,127)
+        value = self.axis_rescale(value,-127,0,0,127)
         self.pub_angle.publish(Int8(data=int(value)))
         print 'angle: ', value
 
@@ -93,7 +94,7 @@ class Node(object):
 
     def accelerate_cmd(self, value):
         self.accelctrl.set_axis_value(value)
-
+        self.accelctrl.update()
         speed = self.accelctrl.speed
 
         # motor does not really start when abs(speed) is below a certain value
@@ -109,7 +110,6 @@ class Node(object):
 
     def brake_to_zero(self):
         self.accelctrl.speed = 0
-        self.accelctrl.acceleration = 0
         self.pub_speed.publish(Int8(data=int(self.accelctrl.speed)))
 
     def update(self):
@@ -119,8 +119,6 @@ class Node(object):
             self.pause = False
 
         if not self.pause:
-            self.accelctrl.update()
-
             if self.joystick.get_button( 2 ) == 1:
                 self.brake_to_zero()
             else:
@@ -134,7 +132,7 @@ class Node(object):
         print " closing..."
 
     def spin(self):
-        r = rospy.Rate(10) # 10hz
+        r = rospy.Rate(self.rate) # in [hz]
         while(self.run):
             # pygame events must be processed to get current values for joystick (happens in the background)
             pygame.event.pump()
@@ -196,14 +194,25 @@ class Node(object):
             self.pub_angle = rospy.Publisher('angle_cmd', Int8, tcp_nodelay=True)
             self.pub_speed = rospy.Publisher('speed_cmd', Int8, tcp_nodelay=True)
 
+            self.rate = 20
             
-            speed = 127 # warp 10
-            #speed = 40  # good speed 
-            #speed = 20  # moderate 
-            accel = 20
-            #accel = 40
+            # speed = 127 # warp 10
+            # speed = 40  # good speed 
+            # speed = 20  # moderate
+            speed = 10  # slow
+            
+            accel = 10
+            # accel = 20
+            # accel = 40
+            # accel = 80
 
-            brake = accel * 10
+            self.speed_1 = 20
+            self.speed_2 = 127
+
+            self.accel_1 = 20
+            self.accel_2 = 80
+
+            brake = accel * 1.0
             # self.accel = Accelerator(max_acceleration = 1, max_speed=20)
             self.accelctrl = AccelerationCarControl(    #accelerations given in 1/s
                 minimum_speed=-speed, maximum_speed=speed,
