@@ -5,17 +5,31 @@ from geometry_msgs.msg import Vector3
 
 class Kalman(object):
 	"""docstring for Kalman"""
+	# http://www.cbcity.de/das-kalman-filter-einfach-erklaert-teil-2
 	def __init__(self, n_states, n_sensors):
 		super(Kalman, self).__init__()
 		self.n_states = n_states
 		self.n_sensors = n_sensors
 
+		# x: Systemzustand
 		self.x = np.matrix(np.zeros(shape=(n_states,1)))
+
+		# P: Unsicherheit über Systemzustand
 		self.P = np.matrix(np.identity(n_states)) 
+
+		# F: Dynamik
 		self.F = np.matrix(np.identity(n_states))
+
+		# u: externe Beeinflussung des Systems
 		self.u = np.matrix(np.zeros(shape=(n_states,1)))
+
+		# H: Messmatrix
 		self.H = np.matrix(np.zeros(shape=(n_sensors, n_states)))
+
+		# R: Messunsicherheit
 		self.R = np.matrix(np.identity(n_sensors))
+
+		# I: Identity
 		self.I = np.matrix(np.identity(n_states))
 
 		self.first = True
