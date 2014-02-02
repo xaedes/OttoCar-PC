@@ -1,6 +1,6 @@
 image_width: 1600
 image_height: 1200
-camera_name: narrow_stereo/left
+camera_name: foobar
 camera_matrix:
   rows: 3
   cols: 3
