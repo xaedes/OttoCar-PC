@@ -69,8 +69,11 @@ class Kalman(object):
         self.P = (self.I - K * self.H) * self.P
 
     def predict(self):
-        self.x = self.F * self.x + self.B * self.u  # de.wikipedia hat noch ein B vor das u multipliziert, B scheint die Dynamik der Stoerung u zu sein
-        self.P = self.F * self.P * self.F.getT() + self.Q   # de.wikipedia hat noch ein Q drauf addiert
+        # x: Systemzustand
+        self.x = self.F * self.x + self.B * self.u
+
+        # P: Unsicherheit der Dynamik
+        self.P = self.F * self.P * self.F.getT() + self.Q   
 
 class ImuSensorsFilter(Kalman):
     """docstring for ImuSensorsFilter"""
@@ -305,7 +308,7 @@ class Subscriber(object):
         self.pub_rps.publish(self.motor.x[1])
 
         self.last_revolutions=self.revolutions
-        
+
         # remove old msgs
         self.imu = self.mag = self.revolutions = None
 
