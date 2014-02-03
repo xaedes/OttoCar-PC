@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 import numpy as np
+from std_msgs.msg import Int32
 from geometry_msgs.msg import Vector3Stamped
 from sensor_msgs.msg import Imu
 
@@ -71,18 +72,18 @@ class Kalman(object):
         self.P = self.F * self.P * self.F.getT() + self.Q   # de.wikipedia hat noch ein Q drauf addiert
 
 class ImuSensorsFilter(Kalman):
-    """docstring for SensorsFilter"""
+    """docstring for ImuSensorsFilter"""
     def __init__(self):
         super(ImuSensorsFilter, self).__init__(n_states = 9, n_sensors = 9)
         #states:
-        #  accel.x,accel.y,accel.z     0:3
-        #  gyro.x,gyro.y,gyro.z        3:6
-        #  mag.x,mag.y,mag.z           6:9        
+        #  accel: x,y,z     0:3
+        #  gyro:  x,y,z     3:6
+        #  mag:   x,y,z     6:9        
 
         #sensors:
-        #  accel.x,accel.y,accel.z     0:3
-        #  gyro.x,gyro.y,gyro.z        3:6
-        #  mag.x,mag.y,mag.z           6:9
+        #  accel: x,y,z     0:3
+        #  gyro:  x,y,z     3:6
+        #  mag:   x,y,z     6:9        
 
         # H: Messmatrix
         self.H = np.matrix( '1 0 0 0 0 0 0 0 0;'    #accel.x
@@ -116,14 +117,33 @@ class ImuSensorsFilter(Kalman):
         # R: Messunsicherheit
         self.R *= 1
 
-    def measure(self,imu,mag):
+
+    def measure(self,imu,mag,biases=None):
         Z = np.matrix([imu.linear_acceleration.x,imu.linear_acceleration.y,imu.linear_acceleration.z,
                        imu.angular_velocity.x,imu.angular_velocity.y,imu.angular_velocity.z,
                        mag.vector.x,mag.vector.y,mag.vector.z]).getT()
 
-
-        self.update(Z)
+        if biases==None:
+            self.update(Z)
+        else:
+            self.update(Z-biases)
         self.predict()
+
+class ImuSensorsBiasFilter(ImuSensorsFilter):
+    """docstring for ImuSensorsBiasFilter"""
+    def __init__(self):
+        super(ImuSensorsBiasFilter, self).__init__()
+
+        # Aenderungen gegenueber ImuSensorsFilter:
+
+        # Q: Unsicherheit der Dynamik 
+        self.Q *= 1
+             
+        # P: Unsicherheit ueber Systemzustand   
+        self.P *= 1
+
+        # R: Messunsicherheit
+        self.R *= 1
 
 class Subscriber(object):
     """docstring for Subscriber"""
@@ -134,20 +154,31 @@ class Subscriber(object):
         self.dt = dt = 1
 
         self.sensors = ImuSensorsFilter()
+        self.sensor_biases = ImuSensorsBiasFilter()
 
 
         # Publishers
         self.pub_imu = rospy.Publisher('/imu/data_filtered', Imu)
+        self.pub_imu_bias = rospy.Publisher('/imu/data_biases', Imu)
         self.pub_mag = rospy.Publisher('/imu/mag_filtered', Vector3Stamped)
 
         # Subscribers
         rospy.Subscriber('/imu/data_raw', Imu, self.callback_imu)
         rospy.Subscriber('/imu/mag', Vector3Stamped, self.callback_mag)
+        rospy.Subscriber('/sensor_distance', Int32, self.callback_revolutions)
 
-        self.imu = self.mag = None
+        self.imu = self.mag = self.revolutions = None
+        self.last_revolutions = None
         self.lock = threading.Lock()
 
         rospy.spin()
+
+    def callback_revolutions(self, msg):
+        self.revolutions = msg.data
+
+        self.lock.acquire()
+        self.measure()
+        self.lock.release()
 
     def callback_imu(self, msg):
         self.imu = msg
@@ -165,10 +196,17 @@ class Subscriber(object):
 
     def measure(self):
         # only proceed if we have all msgs
-        if((self.mag==None)or(self.imu==None)):
+        if((self.mag==None)or(self.imu==None)or(self.revolutions==None)):
             return
 
-        self.sensors.measure(self.imu,self.mag)
+        if(self.last_revolutions==None):
+            self.last_revolutions=self.revolutions
+
+        # update bias if revolutions don't change, i.e. the car is standing still
+        if(self.revolutions-self.last_revolutions == 0):
+            self.sensor_biases.measure(self.imu,self.mag)
+
+        self.sensors.measure(self.imu,self.mag,self.sensor_biases.x)
 
         header = self.mag.header
 
@@ -183,6 +221,16 @@ class Subscriber(object):
         imu.angular_velocity.z = self.sensors.x[5]
         self.pub_imu.publish(imu)
 
+        imu = Imu()
+        imu.header = header
+        imu.linear_acceleration.x = self.sensor_biases.x[0]
+        imu.linear_acceleration.y = self.sensor_biases.x[1]
+        imu.linear_acceleration.z = self.sensor_biases.x[2]
+        imu.angular_velocity.x = self.sensor_biases.x[3]
+        imu.angular_velocity.y = self.sensor_biases.x[4]
+        imu.angular_velocity.z = self.sensor_biases.x[5]
+        self.pub_imu_bias.publish(imu)
+
         mag = Vector3Stamped()
         mag.header = header
         mag.vector.x = self.sensors.x[6]
@@ -191,8 +239,7 @@ class Subscriber(object):
         self.pub_mag.publish(mag)
 
         # remove old msgs
-        self.imu = None
-        self.mag = None
+        self.imu = self.mag = self.revolutions = None
 
         
 
