@@ -82,7 +82,8 @@ class Kalman(object):
 
 
         # P: Unsicherheit der Dynamik
-        self.P = (self.I - K * self.H) * self.P
+        # self.P = (self.I - K * self.H) * self.P
+        self.P = self.P - K * S * K.getT()
         #http://services.eng.uts.edu.au/~sdhuang/1D%20Kalman%20Filter_Shoudong.pdf 
         # ist in Gleichung (8) anders angegeben, vlt ist das aequivalent??
 
@@ -155,11 +156,11 @@ class ImuSensorsFilter(Kalman):
                        imu.angular_velocity.x,imu.angular_velocity.y,imu.angular_velocity.z,
                        mag.vector.x,mag.vector.y,mag.vector.z]).getT()
 
+        self.predict()
         if biases==None:
             self.update(Z)
         else:
             self.update(Z-biases)
-        self.predict()
 
 class ImuSensorsBiasFilter(ImuSensorsFilter):
     """docstring for ImuSensorsBiasFilter"""
@@ -216,8 +217,8 @@ class MotorFilter(Kalman):
     def measure(self,revolutions,rps):
         Z = np.matrix([revolutions,rps]).getT()
 
-        self.update(Z)
         self.predict()
+        self.update(Z)
 
 class Subscriber(object):
     """docstring for Subscriber"""
