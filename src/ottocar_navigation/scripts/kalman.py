@@ -11,7 +11,7 @@ import threading
 class Kalman(object):
     """docstring for Kalman"""
     # http://www.cbcity.de/das-kalman-filter-einfach-erklaert-teil-2
-    #http://de.wikipedia.org/wiki/Kalman-Filter
+    # http://de.wikipedia.org/wiki/Kalman-Filter
     def __init__(self, n_states, n_sensors):
         super(Kalman, self).__init__()
         self.n_states = n_states
@@ -103,6 +103,87 @@ class Kalman(object):
         # Gleichung(6)
         # beim EKF wird es zu P=J_f*P*J_f^T+Q
         # J_f:Jacobian of function f with respect to x evaluated at current x.
+
+class ExtendedKalman(object):
+    """docstring for Kalman"""
+    # http://www.cbcity.de/das-kalman-filter-einfach-erklaert-teil-2
+    # http://de.wikipedia.org/wiki/Kalman-Filter
+    # http://services.eng.uts.edu.au/~sdhuang/1D%20Kalman%20Filter_Shoudong.pdf
+    # http://services.eng.uts.edu.au/~sdhuang/Kalman%20Filter_Shoudong.pdf
+    # http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf
+    def __init__(self, n_states, n_sensors):
+        super(Kalman, self).__init__()
+        self.n_states = n_states
+        self.n_sensors = n_sensors
+
+        # x: Systemzustand
+        self.x = np.matrix(np.zeros(shape=(n_states,1)))
+
+        # P: Unsicherheit ueber Systemzustand
+        self.P = np.matrix(np.identity(n_states)) 
+
+        # F: Dynamik
+        self.f = lambda x,u: np.matrix(np.identity(n_states)) * x
+
+        # Q: Dynamik Unsicherheit
+        self.Q = np.matrix(np.zeros(shape=(n_states,n_states)))
+
+        # u: externe Beeinflussung des Systems
+        self.u = np.matrix(np.zeros(shape=(n_states,1)))
+
+        # B: Dynamik der externen Einfluesse
+        self.B = np.matrix(np.identity(n_states))
+
+        # h: Messfunktion
+        self.h = lambda x: np.matrix(np.zeros(shape=(n_sensors, 1)))
+
+        # R: Messunsicherheit
+        self.R = np.matrix(np.identity(n_sensors))
+
+        # I: Einheitsmatrix
+        self.I = np.matrix(np.identity(n_states))
+
+        self.first = True
+
+    # jacobi, differentiation:
+    # https://code.google.com/p/numdifftools/   (numerical) easiest to use, so just use this
+    # http://sympy.org/en/index.html            (symbolic)
+    # http://openopt.org/FuncDesigner           (automatic, better than numerical)
+
+    def update(self, Z):
+        '''Z: new sensor values as numpy matrix'''
+
+        # print 'Z.shape', Z.shape
+        # print 'self.H.shape', self.H.shape
+        # print 'self.x.shape', self.x.shape
+
+        # w: Innovation (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 7)
+        w = Z - self.h(self.x)
+
+        # J_h:Jacobian of function h evaluated at current x
+        #J_h = ...
+
+        # S: Residualkovarianz (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 9)
+        S = J_h  * self.P * J_h.getT() + self.R
+
+        # K: Kalman-Gain (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 10)
+        K = self.P * J_h.getT() * S.getI()
+
+        # x: Systemzustand
+        self.x = self.x + K * w
+
+        # P: Unsicherheit der Dynamik (http://services.eng.uts.edu.au/~sdhuang/1D%20Kalman%20Filter_Shoudong.pdf Eq. 8)
+        self.P = self.P - K * S * K.getT()
+
+    def predict(self):
+        # x: Systemzustand (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 5)
+        self.x = self.f(self.x, self.u)
+
+        # J_f:Jacobian of function f with respect to x evaluated at current x.
+        #J_f = ...
+
+        # P: Unsicherheit der Dynamik (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 6)
+        self.P = J_f * self.P * J_f.getT() + self.Q
 
 class ImuSensorsFilter(Kalman):
     """docstring for ImuSensorsFilter"""
