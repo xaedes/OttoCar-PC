@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 import rospy
 import numpy as np
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Vector3Stamped
+from sensor_msgs.msg import Imu
+
+import threading
 
 class Kalman(object):
 	"""docstring for Kalman"""
 	# http://www.cbcity.de/das-kalman-filter-einfach-erklaert-teil-2
+	#http://de.wikipedia.org/wiki/Kalman-Filter
 	def __init__(self, n_states, n_sensors):
 		super(Kalman, self).__init__()
 		self.n_states = n_states
@@ -14,14 +18,20 @@ class Kalman(object):
 		# x: Systemzustand
 		self.x = np.matrix(np.zeros(shape=(n_states,1)))
 
-		# P: Unsicherheit über Systemzustand
+		# P: Unsicherheit ueber Systemzustand
 		self.P = np.matrix(np.identity(n_states)) 
 
 		# F: Dynamik
 		self.F = np.matrix(np.identity(n_states))
 
+		# Q: Dynamik Unsicherheit
+		self.Q = np.matrix(np.zeros(shape=(n_states,n_states)))
+
 		# u: externe Beeinflussung des Systems
 		self.u = np.matrix(np.zeros(shape=(n_states,1)))
+
+		# B: Dynamik der externen Einfluesse
+		self.B = np.matrix(np.identity(n_states))
 
 		# H: Messmatrix
 		self.H = np.matrix(np.zeros(shape=(n_sensors, n_states)))
@@ -41,133 +51,147 @@ class Kalman(object):
 		# print 'self.H.shape', self.H.shape
 		# print 'self.x.shape', self.x.shape
 
+		# w: Innovation
 		w = Z - self.H * self.x
-		S = self.H * self.P * self.H.getT() + self.R
+
+		# S: Residualkovarianz (http://de.wikipedia.org/wiki/Kalman-Filter#Korrektur)
+		S = self.H * self.P * self.H.getT() + self.R 		# sieht in wikipedia etwas anders aus..
+
+		# K: Kalman-Gain
 		K = self.P * self.H.getT() * S.getI()
+
+		# x: Systemzustand
 		self.x = self.x + K * w
+
+		# P: Unsicherheit der Dynamik
 		self.P = (self.I - K * self.H) * self.P
 
 	def predict(self):
-		self.x = self.F * self.x + self.u
-		self.P = self.F * self.P * self.F.getT()
+		self.x = self.F * self.x + self.B * self.u 	# de.wikipedia hat noch ein B vor das u multipliziert, B scheint die Dynamik der Stoerung u zu sein
+		self.P = self.F * self.P * self.F.getT() + self.Q	# de.wikipedia hat noch ein Q drauf addiert
 
 class Subscriber(object):
 	"""docstring for Subscriber"""
 	def __init__(self):
 		super(Subscriber, self).__init__()
-		rospy.init_node('imu_conv', anonymous=True)
+		rospy.init_node('kalman', anonymous=True)
 
 		self.dt = dt = 1
 
 		#states:
-		# [pos.x,pos.y,pos.z,			0:3
-		#  veloc.x,veloc.y,veloc.z,		3:6
-		#  accel.x,accel.y,accel.z,		6:9
-		#  gyro.x,gyro.y,gyro.z,		9:12
-		#  orientation]					12
-		#
+		# [accel.x,accel.y,accel.z,		0:3
+		#  gyro.x,gyro.y,gyro.z,		3:6
+		#  mag.x,mag.y,mag.z			6:9
+		#  ]					
 
-		self.kalman = Kalman(n_states = 12, n_sensors = 5)
+		self.kalman = Kalman(n_states = 9, n_sensors = 9)
 
 
 		# H: Messmatrix
-		self.kalman.H = np.matrix(	'0 0 0 0 0 0 1 0 0 0 0 0 0;'	#accel.x
-									'0 0 0 0 0 0 0 1 0 0 0 0 0;'	#accel.y
-									'0 0 0 0 0 0 0 0 1 0 0 0 0;'	#accel.z
-									'0 0 0 0 0 1 0 0 0 0 0 0 0;'	#assume: veloc.z = 0
-									'0 0 1 0 0 0 0 0 0 0 0 0 0;'	#assume: pos.z = 0
-									'0 0 0 0 0 0 0 0 0 0 0 0 0;'  #assume: gyro.x = 0
-									'0 0 0 0 0 0 0 0 0 0 0 0 0;'  #assume: gyro.y = 0
+		self.kalman.H = np.matrix(	'1 0 0 0 0 0 0 0 0;'	#accel.x
+									'0 1 0 0 0 0 0 0 0;'	#accel.y
+									'0 0 1 0 0 0 0 0 0;'	#accel.z
+									'0 0 0 1 0 0 0 0 0;'	#gyro.x
+									'0 0 0 0 1 0 0 0 0;'	#gyro.y
+									'0 0 0 0 0 1 0 0 0;'	#gyro.z
+									'0 0 0 0 0 0 1 0 0;'	#mag.x
+									'0 0 0 0 0 0 0 1 0;'	#mag.y
+									'0 0 0 0 0 0 0 0 1'		#mag.z
+			
 									)
 		# F: Dynamik
-		self.kalman.F = np.matrix([	[1,0,0,dt,0,0,0,0,0,0,0,0,0],	#pos.x = pos.x + dt*veloc.x
-									[0,1,0,0,dt,0,0,0,0,0,0,0,0],	#pos.y = pos.y + dt*veloc.y
-									[0,0,1,0,0,dt,0,0,0,0,0,0,0],	#pos.y = pos.z + dt*veloc.z
-									[0,0,0,1,0,0,dt,0,0,0,0,0,0],	#veloc.x = veloc.x + dt*accel.x
-									[0,0,0,0,1,0,0,dt,0,0,0,0,0],	#veloc.y = veloc.y + dt*accel.y
-									[0,0,0,0,0,1,0,0,dt,0,0,0,0],	#veloc.z = veloc.z + dt*accel.z
-									[0,0,0,0,0,0,1,0,0,0,0,0,0],	#accel.x = accel.x
-									[0,0,0,0,0,0,0,1,0,0,0,0,0],	#accel.y = accel.y
-									[0,0,0,0,0,0,0,0,1,0,0,0,0],	#accel.z = accel.z
-									[0,0,0,0,0,0,0,0,0,1,0,0,0],	#gyro.x = gyro.x
-									[0,0,0,0,0,0,0,0,0,0,1,0,0],	#gyro.y = gyro.y
-									[0,0,0,0,0,0,0,0,0,0,0,1,0],	#gyro.z = gyro.z
-									[0,0,0,0,0,0,0,0,0,0,0,dt,1] 	#orientation = orientation + dt*gyro.z
+		self.kalman.F = np.matrix([	[1,0,0,0,0,0,0,0,0],	#accel.x = accel.x
+									[0,1,0,0,0,0,0,0,0],	#accel.y = accel.y
+									[0,0,1,0,0,0,0,0,0],	#accel.z = accel.z
+									[0,0,0,1,0,0,0,0,0],	#gyro.x = gyro.x
+									[0,0,0,0,1,0,0,0,0],	#gyro.y = gyro.y
+									[0,0,0,0,0,1,0,0,0],	#gyro.z = gyro.z
+									[0,0,0,0,0,0,1,0,0],	#mag.x = mag.x
+									[0,0,0,0,0,0,0,1,0],	#mag.y = mag.y
+									[0,0,0,0,0,0,0,0,1] 	#mag.z = mag.z
 									])
 
+		# Q: Unsicherheit der Dynamik 
+		self.kalman.Q = np.matrix(np.identity(self.kalman.n_states)) * 0.1
 
-		# P: Unsicherheit über Systemzustand	
+
+		# P: Unsicherheit ueber Systemzustand	
 		self.P = 0.1
 		self.kalman.P *= self.P
 
 		# R: Messunsicherheit
 		# self.kalman.R *= 1000 ** 3
 		self.kalman.R *= 1
-		# self.kalman.R *= 0.000000000000000000000000000000000000002
+		# self.kalman.R *= 0.000001
 
 		# Publishers
-		self.pub_accel = rospy.Publisher('/accelerometer/kalman', Vector3)
-		self.pub_veloc = rospy.Publisher('/velocity/kalman', Vector3)
-		self.pub_pos = rospy.Publisher('/position/kalman', Vector3)
-		# self.pub_accel_var_min = rospy.Publisher('kalman/accelerometer_var_min', Vector3)
-		# self.pub_accel_var_max = rospy.Publisher('kalman/accelerometer_var_max', Vector3)
+		self.pub_imu = rospy.Publisher('/imu/filtered', Imu)
+		self.pub_mag = rospy.Publisher('/imu/mag_filtered', Vector3Stamped)
 
 		# Subscribers
-		rospy.Subscriber('/accelerometer/calibrated', Vector3, self.callback_accel)
+		rospy.Subscriber('/imu/data_raw', Imu, self.callback_imu)
+		rospy.Subscriber('/imu/mag', Vector3Stamped, self.callback_mag)
+
+		self.imu = self.mag = None
+		self.lock = threading.Lock()
+
 		rospy.spin()
 
-	def callback_accel(self, data):
-		# print "received data: ", data
-		Z = np.matrix([data.x,data.y,data.z,0,0,0,0]).getT()
+	def callback_imu(self, msg):
+		self.imu = msg
+
+		self.lock.acquire()
+		self.measure()
+		self.lock.release()
+
+	def callback_mag(self, msg):
+		self.mag = msg
+
+		self.lock.acquire()
+		self.measure()
+		self.lock.release()
+
+	def measure(self):
+		# only proceed if we have all msgs
+		if((self.mag==None)or(self.imu==None)):
+			return
+
+
+		Z = np.matrix([self.imu.linear_acceleration.x,self.imu.linear_acceleration.y,self.imu.linear_acceleration.z,
+						self.imu.angular_velocity.x,self.imu.angular_velocity.y,self.imu.angular_velocity.z,
+						self.mag.vector.x,self.mag.vector.y,self.mag.vector.z]).getT()
 
 		if self.kalman.first:
-			# self.kalman.x[3:6,0] = Z
 			self.kalman.first = False
-
-		# P: Unsicherheit über Systemzustand
-		# reset for accel
-		self.kalman.P[6:9,6:9] = np.matrix(np.identity(3)) * self.P
-
 
 		self.kalman.update(Z)
 		self.kalman.predict()
 
-		vec = Vector3()
-		vec.x = self.kalman.x[0]
-		vec.y = self.kalman.x[1]
-		vec.z = self.kalman.x[2]
+		header = self.mag.header
 
-		self.pub_pos.publish(vec)
+		# publish filtered data
+		imu = Imu()
+		imu.header = header
+		imu.linear_acceleration.x = self.kalman.x[0]
+		imu.linear_acceleration.y = self.kalman.x[1]
+		imu.linear_acceleration.z = self.kalman.x[2]
+		imu.angular_velocity.x = self.kalman.x[3]
+		imu.angular_velocity.y = self.kalman.x[4]
+		imu.angular_velocity.z = self.kalman.x[5]
+		self.pub_imu.publish(imu)
 
-		vec = Vector3()
-		vec.x = self.kalman.x[3]
-		vec.y = self.kalman.x[4]
-		vec.z = self.kalman.x[5]
+		mag = Vector3Stamped()
+		mag.header = header
+		mag.vector.x = self.kalman.x[6]
+		mag.vector.y = self.kalman.x[7]
+		mag.vector.z = self.kalman.x[8]
+		self.pub_mag.publish(mag)
 
-		self.pub_veloc.publish(vec)
+		# remove old msgs
+		self.imu = None
+		self.mag = None
 
-		vec = Vector3()
-		vec.x = self.kalman.x[6]
-		vec.y = self.kalman.x[7]
-		vec.z = self.kalman.x[8]
-
-		self.pub_accel.publish(vec)
-
-		# foo = 100
-		# vec = Vector3()
-		# vec.x = self.kalman.x[0,0] - self.kalman.P[0,0] * foo
-		# vec.y = self.kalman.x[1,0] - self.kalman.P[1,1] * foo
-		# vec.z = self.kalman.x[2,0] - self.kalman.P[2,2] * foo
-
-		# self.pub_accel_var_min.publish(vec)
-
-		# vec = Vector3()
-		# vec.x = self.kalman.x[0,0] + self.kalman.P[0,0] * foo
-		# vec.y = self.kalman.x[1,0] + self.kalman.P[1,1] * foo
-		# vec.z = self.kalman.x[2,0] + self.kalman.P[2,2] * foo
-
-		# self.pub_accel_var_max.publish(vec)
-
+		
 
 
 if __name__ == '__main__':
