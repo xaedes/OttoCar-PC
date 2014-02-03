@@ -70,6 +70,61 @@ class Kalman(object):
         self.x = self.F * self.x + self.B * self.u  # de.wikipedia hat noch ein B vor das u multipliziert, B scheint die Dynamik der Stoerung u zu sein
         self.P = self.F * self.P * self.F.getT() + self.Q   # de.wikipedia hat noch ein Q drauf addiert
 
+class ImuSensorsFilter(Kalman):
+    """docstring for SensorsFilter"""
+    def __init__(self):
+        super(ImuSensorsFilter, self).__init__(n_states = 9, n_sensors = 9)
+        #states:
+        #  accel.x,accel.y,accel.z     0:3
+        #  gyro.x,gyro.y,gyro.z        3:6
+        #  mag.x,mag.y,mag.z           6:9        
+
+        #sensors:
+        #  accel.x,accel.y,accel.z     0:3
+        #  gyro.x,gyro.y,gyro.z        3:6
+        #  mag.x,mag.y,mag.z           6:9
+
+        # H: Messmatrix
+        self.H = np.matrix( '1 0 0 0 0 0 0 0 0;'    #accel.x
+                            '0 1 0 0 0 0 0 0 0;'    #accel.y
+                            '0 0 1 0 0 0 0 0 0;'    #accel.z
+                            '0 0 0 1 0 0 0 0 0;'    #gyro.x
+                            '0 0 0 0 1 0 0 0 0;'    #gyro.y
+                            '0 0 0 0 0 1 0 0 0;'    #gyro.z
+                            '0 0 0 0 0 0 1 0 0;'    #mag.x
+                            '0 0 0 0 0 0 0 1 0;'    #mag.y
+                            '0 0 0 0 0 0 0 0 1 '    #mag.z
+                            )
+        # F: Dynamik
+        self.F = np.matrix([[1,0,0,0,0,0,0,0,0],    #accel.x = accel.x
+                            [0,1,0,0,0,0,0,0,0],    #accel.y = accel.y
+                            [0,0,1,0,0,0,0,0,0],    #accel.z = accel.z
+                            [0,0,0,1,0,0,0,0,0],    #gyro.x = gyro.x
+                            [0,0,0,0,1,0,0,0,0],    #gyro.y = gyro.y
+                            [0,0,0,0,0,1,0,0,0],    #gyro.z = gyro.z
+                            [0,0,0,0,0,0,1,0,0],    #mag.x = mag.x
+                            [0,0,0,0,0,0,0,1,0],    #mag.y = mag.y
+                            [0,0,0,0,0,0,0,0,1]     #mag.z = mag.z
+                            ])
+
+        # Q: Unsicherheit der Dynamik 
+        self.Q = np.matrix(np.identity(self.n_states)) * 0.1    
+             
+        # P: Unsicherheit ueber Systemzustand   
+        self.P *= 0.1
+
+        # R: Messunsicherheit
+        self.R *= 1
+
+    def measure(self,imu,mag):
+        Z = np.matrix([imu.linear_acceleration.x,imu.linear_acceleration.y,imu.linear_acceleration.z,
+                       imu.angular_velocity.x,imu.angular_velocity.y,imu.angular_velocity.z,
+                       mag.vector.x,mag.vector.y,mag.vector.z]).getT()
+
+
+        self.update(Z)
+        self.predict()
+
 class Subscriber(object):
     """docstring for Subscriber"""
     def __init__(self):
@@ -78,54 +133,11 @@ class Subscriber(object):
 
         self.dt = dt = 1
 
-        #states:
-        # [accel.x,accel.y,accel.z,     0:3
-        #  gyro.x,gyro.y,gyro.z,        3:6
-        #  mag.x,mag.y,mag.z            6:9
-        #  ]                    
+        self.sensors = ImuSensorsFilter()
 
-        self.kalman = Kalman(n_states = 9, n_sensors = 9)
-
-
-        # H: Messmatrix
-        self.kalman.H = np.matrix(  '1 0 0 0 0 0 0 0 0;'    #accel.x
-                                    '0 1 0 0 0 0 0 0 0;'    #accel.y
-                                    '0 0 1 0 0 0 0 0 0;'    #accel.z
-                                    '0 0 0 1 0 0 0 0 0;'    #gyro.x
-                                    '0 0 0 0 1 0 0 0 0;'    #gyro.y
-                                    '0 0 0 0 0 1 0 0 0;'    #gyro.z
-                                    '0 0 0 0 0 0 1 0 0;'    #mag.x
-                                    '0 0 0 0 0 0 0 1 0;'    #mag.y
-                                    '0 0 0 0 0 0 0 0 1'     #mag.z
-            
-                                    )
-        # F: Dynamik
-        self.kalman.F = np.matrix([ [1,0,0,0,0,0,0,0,0],    #accel.x = accel.x
-                                    [0,1,0,0,0,0,0,0,0],    #accel.y = accel.y
-                                    [0,0,1,0,0,0,0,0,0],    #accel.z = accel.z
-                                    [0,0,0,1,0,0,0,0,0],    #gyro.x = gyro.x
-                                    [0,0,0,0,1,0,0,0,0],    #gyro.y = gyro.y
-                                    [0,0,0,0,0,1,0,0,0],    #gyro.z = gyro.z
-                                    [0,0,0,0,0,0,1,0,0],    #mag.x = mag.x
-                                    [0,0,0,0,0,0,0,1,0],    #mag.y = mag.y
-                                    [0,0,0,0,0,0,0,0,1]     #mag.z = mag.z
-                                    ])
-
-        # Q: Unsicherheit der Dynamik 
-        self.kalman.Q = np.matrix(np.identity(self.kalman.n_states)) * 0.1
-
-
-        # P: Unsicherheit ueber Systemzustand   
-        self.P = 0.1
-        self.kalman.P *= self.P
-
-        # R: Messunsicherheit
-        # self.kalman.R *= 1000 ** 3
-        self.kalman.R *= 1
-        # self.kalman.R *= 0.000001
 
         # Publishers
-        self.pub_imu = rospy.Publisher('/imu/filtered', Imu)
+        self.pub_imu = rospy.Publisher('/imu/data_filtered', Imu)
         self.pub_mag = rospy.Publisher('/imu/mag_filtered', Vector3Stamped)
 
         # Subscribers
@@ -156,35 +168,26 @@ class Subscriber(object):
         if((self.mag==None)or(self.imu==None)):
             return
 
-
-        Z = np.matrix([self.imu.linear_acceleration.x,self.imu.linear_acceleration.y,self.imu.linear_acceleration.z,
-                       self.imu.angular_velocity.x,self.imu.angular_velocity.y,self.imu.angular_velocity.z,
-                       self.mag.vector.x,self.mag.vector.y,self.mag.vector.z]).getT()
-
-        if self.kalman.first:
-            self.kalman.first = False
-
-        self.kalman.update(Z)
-        self.kalman.predict()
+        self.sensors.measure(self.imu,self.mag)
 
         header = self.mag.header
 
         # publish filtered data
         imu = Imu()
         imu.header = header
-        imu.linear_acceleration.x = self.kalman.x[0]
-        imu.linear_acceleration.y = self.kalman.x[1]
-        imu.linear_acceleration.z = self.kalman.x[2]
-        imu.angular_velocity.x = self.kalman.x[3]
-        imu.angular_velocity.y = self.kalman.x[4]
-        imu.angular_velocity.z = self.kalman.x[5]
+        imu.linear_acceleration.x = self.sensors.x[0]
+        imu.linear_acceleration.y = self.sensors.x[1]
+        imu.linear_acceleration.z = self.sensors.x[2]
+        imu.angular_velocity.x = self.sensors.x[3]
+        imu.angular_velocity.y = self.sensors.x[4]
+        imu.angular_velocity.z = self.sensors.x[5]
         self.pub_imu.publish(imu)
 
         mag = Vector3Stamped()
         mag.header = header
-        mag.vector.x = self.kalman.x[6]
-        mag.vector.y = self.kalman.x[7]
-        mag.vector.z = self.kalman.x[8]
+        mag.vector.x = self.sensors.x[6]
+        mag.vector.y = self.sensors.x[7]
+        mag.vector.z = self.sensors.x[8]
         self.pub_mag.publish(mag)
 
         # remove old msgs
