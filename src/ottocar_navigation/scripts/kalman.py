@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 import rospy
 import numpy as np
+import numdifftools as nd   # sudo pip install numdifftools
+
+
 from std_msgs.msg import Int32
 from std_msgs.msg import Float32
 from geometry_msgs.msg import Vector3Stamped
@@ -161,7 +164,8 @@ class ExtendedKalman(object):
         w = Z - self.h(self.x)
 
         # J_h:Jacobian of function h evaluated at current x
-        #J_h = ...
+        J_h = nd.Jacobian(self.h)
+        J_h = J_h(self.x)
 
         # S: Residualkovarianz (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 9)
         S = J_h  * self.P * J_h.getT() + self.R
@@ -180,7 +184,8 @@ class ExtendedKalman(object):
         self.x = self.f(self.x, self.u)
 
         # J_f:Jacobian of function f with respect to x evaluated at current x.
-        #J_f = ...
+        J_f = nd.Jacobian(lambda x: self.f(x, self.u))
+        J_f = J_f(self.x)
 
         # P: Unsicherheit der Dynamik (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 6)
         self.P = J_f * self.P * J_f.getT() + self.Q
