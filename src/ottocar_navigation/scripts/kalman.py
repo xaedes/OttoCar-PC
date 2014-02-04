@@ -169,12 +169,12 @@ class ExtendedKalman(object):
         # print Z
 
         # w: Innovation (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 7)
-        w = Z - self.h(self.x)
+        w = Z - np.matrix(self.h(np.array(self.x)))
         # print w
 # 
         # J_h:Jacobian of function h evaluated at current x
         # conversions between np.array and np.matrix are necessary because nd.Jacobian needs np.array, but we use np.matrix everywhere
-        J_h = nd.Jacobian(lambda x: np.array(self.h(np.matrix(x))))
+        J_h = nd.Jacobian(self.h)
         J_h = np.matrix(J_h(np.array(self.x)))
 
         # S: Residualkovarianz (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 9)
@@ -193,12 +193,12 @@ class ExtendedKalman(object):
     def predict(self):
         # x: Systemzustand (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 5)
         # print self.x
-        self.x = self.f(self.x, self.u)
+        self.x = np.matrix(self.f(np.array(self.x), np.array(self.u)))
         # print self.x
 
         # J_f:Jacobian of function f with respect to x evaluated at current x.
         # conversions between np.array and np.matrix are necessary because nd.Jacobian only works with np.array, but we use np.matrix everywhere
-        J_f = nd.Jacobian(lambda x: np.array(self.f(np.matrix(x), self.u)))
+        J_f = nd.Jacobian(lambda x: self.f(x, self.u))
         J_f = np.matrix(J_f(np.array(self.x)))
 
 
@@ -306,14 +306,14 @@ class MotionModelCV(ExtendedKalman):
 
         self.dt = dt
         # F: Dynamik
-        self.f_dt = lambda x,u,dt: np.matrix([
+        self.f_dt = lambda x,u,dt: np.array([
             [x[0,0] + dt*x[1,0]], # velocity     = velocity + dt * acceleration
             [0]])             # acceleration = 0
         self.f = functools.partial(self.f_dt, dt=self.dt)
 
         # h: Messfunktion
         # function h can be used to compute the predicted measurement from the predicted state
-        self.h = lambda x: np.matrix([x[1,0]])
+        self.h = lambda x: np.array([x[1,0]])
 
     def update_dt(self,dt):
         self.dt = dt
@@ -367,7 +367,6 @@ class Subscriber(object):
         self.imu = self.mag = self.revolutions = None
         self.rps = 0
         self.last_revolutions = self.last_rps_time = self.last_time = None
-        self.lock = threading.Lock()
 
 
 
@@ -392,7 +391,6 @@ class Subscriber(object):
 
     def callback_imu(self, msg):
         self.imu = msg
-
 
     def callback_mag(self, msg):
         self.mag = msg
