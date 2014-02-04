@@ -54,6 +54,9 @@ class Kalman(object):
 
         self.first = True
 
+    def reset(self):
+        self.x *= 0
+
     def update(self, Z):
         '''Z: new sensor values as numpy matrix'''
 
@@ -162,6 +165,9 @@ class ExtendedKalman(object):
     # https://code.google.com/p/numdifftools/   (numerical) easiest to use, so just use this
     # http://sympy.org/en/index.html            (symbolic)
     # http://openopt.org/FuncDesigner           (automatic, better than numerical)
+
+    def reset(self):
+        self.x *= 0
 
     def update(self, Z):
         '''Z: new sensor values as numpy matrix'''
@@ -308,7 +314,7 @@ class MotionModelCV(ExtendedKalman):
         # F: Dynamik
         self.f_dt = lambda x,u,dt: np.array([
             [x[0,0] + dt*x[1,0]], # velocity     = velocity + dt * acceleration
-            [0]])             # acceleration = 0
+            [0]])                 # acceleration = 0
         self.f = functools.partial(self.f_dt, dt=self.dt)
 
         # h: Messfunktion
@@ -372,6 +378,19 @@ class Subscriber(object):
 
         self.spin()
 
+    def reset(self):
+        self.dt = 1./min(self.rate,40.) # topic rate ~ 40hz
+        
+        self.sensors.reset()
+        self.sensor_biases.reset()
+        self.motion_cv.reset()
+
+        self.imu = self.mag = self.revolutions = None
+        self.rps = 0
+        self.last_revolutions = self.last_rps_time = self.last_time = None
+
+        print "reset"
+
     def callback_revolutions(self, msg):
         self.revolutions = msg.data
 
@@ -395,6 +414,9 @@ class Subscriber(object):
     def callback_mag(self, msg):
         self.mag = msg
 
+        if(msg.header.seq == 9379):
+            self.reset()
+
 
 
     def spin(self):
@@ -408,7 +430,7 @@ class Subscriber(object):
 
     def measure(self):
         # only proceed if we have all msgs
-        if((self.mag==None)or(self.imu==None)or(self.revolutions==None)):
+        if((self.mag==None)or(self.imu==None)or(self.rps==None)):
             return
 
         # filter dt
