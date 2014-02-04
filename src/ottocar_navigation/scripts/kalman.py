@@ -10,6 +10,10 @@ from std_msgs.msg import Float32
 from geometry_msgs.msg import Vector3Stamped
 from sensor_msgs.msg import Imu
 
+import functools
+import sys
+
+
 import threading
 
 class Kalman(object):
@@ -116,7 +120,7 @@ class ExtendedKalman(object):
     # http://services.eng.uts.edu.au/~sdhuang/Kalman%20Filter_Shoudong.pdf
     # http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf
     def __init__(self, n_states, n_sensors):
-        super(Kalman, self).__init__()
+        super(ExtendedKalman, self).__init__()
         self.n_states = n_states
         self.n_sensors = n_sensors
 
@@ -127,10 +131,12 @@ class ExtendedKalman(object):
         self.P = np.matrix(np.identity(n_states)) 
 
         # F: Dynamik
+        # x,u,and return type are np.matrix
         self.f = lambda x,u: np.matrix(np.identity(n_states)) * x
 
         # Q: Dynamik Unsicherheit
-        self.Q = np.matrix(np.zeros(shape=(n_states,n_states)))
+        # self.Q = np.matrix(np.zeros(shape=(n_states,n_states)))
+        self.Q = np.matrix(np.identity(n_states)) 
 
         # u: externe Beeinflussung des Systems
         self.u = np.matrix(np.zeros(shape=(n_states,1)))
@@ -139,6 +145,7 @@ class ExtendedKalman(object):
         self.B = np.matrix(np.identity(n_states))
 
         # h: Messfunktion
+        # x,and return type are np.matrix
         # function h can be used to compute the predicted measurement from the predicted state
         #  (http://www.lr.tudelft.nl/fileadmin/Faculteit/LR/Organisatie/Afdelingen_en_Leerstoelen/Afdeling_AEWE/Applied_Sustainable_Science_Engineering_and_Technology/Education/AE4-T40_Kites,_Smart_kites,_Control_and_Energy_Production/doc/Lecture5.ppt)
         self.h = lambda x: np.matrix(np.zeros(shape=(n_sensors, 1)))
@@ -159,22 +166,23 @@ class ExtendedKalman(object):
     def update(self, Z):
         '''Z: new sensor values as numpy matrix'''
 
-        # print 'Z.shape', Z.shape
-        # print 'self.H.shape', self.H.shape
-        # print 'self.x.shape', self.x.shape
+        # print Z
 
         # w: Innovation (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 7)
         w = Z - self.h(self.x)
-
+        # print w
+# 
         # J_h:Jacobian of function h evaluated at current x
-        J_h = nd.Jacobian(self.h)
-        J_h = J_h(self.x)
+        # conversions between np.array and np.matrix are necessary because nd.Jacobian needs np.array, but we use np.matrix everywhere
+        J_h = nd.Jacobian(lambda x: np.array(self.h(np.matrix(x))))
+        J_h = np.matrix(J_h(np.array(self.x)))
 
         # S: Residualkovarianz (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 9)
         S = J_h  * self.P * J_h.getT() + self.R
 
         # K: Kalman-Gain (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 10)
         K = self.P * J_h.getT() * S.getI()
+
 
         # x: Systemzustand
         self.x = self.x + K * w
@@ -184,11 +192,19 @@ class ExtendedKalman(object):
 
     def predict(self):
         # x: Systemzustand (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 5)
+        # print self.x
         self.x = self.f(self.x, self.u)
+        # print self.x
 
         # J_f:Jacobian of function f with respect to x evaluated at current x.
-        J_f = nd.Jacobian(lambda x: self.f(x, self.u))
-        J_f = J_f(self.x)
+        # conversions between np.array and np.matrix are necessary because nd.Jacobian only works with np.array, but we use np.matrix everywhere
+        J_f = nd.Jacobian(lambda x: np.array(self.f(np.matrix(x), self.u)))
+        J_f = np.matrix(J_f(np.array(self.x)))
+
+
+        # print J_f
+        # print self.Q
+        # sys.exit()
 
         # P: Unsicherheit der Dynamik (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 6)
         self.P = J_f * self.P * J_f.getT() + self.Q
@@ -206,6 +222,10 @@ class ImuSensorsFilter(Kalman):
         #  accel: x,y,z     0:3
         #  gyro:  x,y,z     3:6
         #  mag:   x,y,z     6:9        
+
+        self.states = self.sensors = {'accel.x': 0, 'accel.y': 1, 'accel.z': 2,
+                                      'gyro.x':  3, 'gyro.y':  4, 'gyro.z':  5,
+                                      'mag.x':   6, 'mag.y':   7, 'mag.z':   8}
 
         # H: Messmatrix
         self.H = np.matrix( '1 0 0 0 0 0 0 0 0;'    #accel.x
@@ -267,6 +287,42 @@ class ImuSensorsBiasFilter(ImuSensorsFilter):
         # R: Messunsicherheit
         self.R *= 1
  
+class MotionModelCV(ExtendedKalman):
+    """Constant Velocity linear motion model"""
+    #http://www.isif.org/fusion/proceedings/fusion08CD/papers/1569107835.pdf
+    def __init__(self, dt):
+        super(MotionModelCV, self).__init__(n_states = 2, n_sensors = 1)
+        #states:
+        #  velocity      0
+        #  acceleration  1
+
+        #sensors:
+        #  acceleration  0
+
+        self.states = {'velocity': 0, 'acceleration': 1}
+        self.sensors = {'acceleration': 0}
+
+        # self.x[1,0] = 10
+
+        self.dt = dt
+        # F: Dynamik
+        self.f_dt = lambda x,u,dt: np.matrix([
+            [x[0,0] + dt*x[1,0]], # velocity     = velocity + dt * acceleration
+            [0]])             # acceleration = 0
+        self.f = functools.partial(self.f_dt, dt=self.dt)
+
+        # h: Messfunktion
+        # function h can be used to compute the predicted measurement from the predicted state
+        self.h = lambda x: np.matrix([x[1,0]])
+
+    def measure(self,acceleration):
+        # print acceleration
+        # Z = np.matrix([[acceleration]])
+        Z = np.matrix([acceleration]).getT()
+
+        self.predict()
+        self.update(Z)
+
 
 class Subscriber(object):
     """docstring for Subscriber"""
@@ -279,11 +335,16 @@ class Subscriber(object):
         self.sensors = ImuSensorsFilter()
         self.sensor_biases = ImuSensorsBiasFilter()
 
+        self.motion_cv = MotionModelCV(dt=self.dt)
+
         # Publishers
         self.pub_imu = rospy.Publisher('/imu/data_filtered', Imu)
         self.pub_imu_bias = rospy.Publisher('/imu/data_biases', Imu)
         self.pub_mag = rospy.Publisher('/imu/mag_filtered', Vector3Stamped)
         self.pub_rps = rospy.Publisher('/rps', Float32)
+
+        self.pub_cv_vel = rospy.Publisher('/motion/cv/velocity', Float32)
+        self.pub_cv_acc = rospy.Publisher('/motion/cv/acceleration', Float32)
 
         # Subscribers
         rospy.Subscriber('/imu/data_raw', Imu, self.callback_imu)
@@ -347,6 +408,9 @@ class Subscriber(object):
 
         header = self.mag.header
 
+        # update motion model
+        self.motion_cv.measure(self.sensors.x[self.sensors.states['accel.x'],0])
+
         ######### publish filtered data
 
         # publish filtered imu
@@ -382,7 +446,9 @@ class Subscriber(object):
         # publish rps
         self.pub_rps.publish(self.rps)
 
-
+        # publish data from motion model 
+        self.pub_cv_vel.publish(self.motion_cv.x[self.motion_cv.states['velocity'],0])
+        self.pub_cv_acc.publish(self.motion_cv.x[self.motion_cv.states['acceleration'],0])
 
         # remove old msgs
         self.imu = self.mag = self.revolutions = None
