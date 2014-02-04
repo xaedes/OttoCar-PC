@@ -429,8 +429,10 @@ class Subscriber(object):
         if(self.last_time == None):
             self.last_time = time()
         dt_now = time()-self.last_time
+        self.last_time = time()
         self.dt = self.dt_gain * dt_now + (1-self.dt_gain) * self.dt
 
+        # periodical print of refresh rate
         self.counter += 1
         if(self.counter==10):
             print 1/self.dt
@@ -443,6 +445,7 @@ class Subscriber(object):
         # update sensors
         self.sensors.measure(self.imu,self.mag,self.sensor_biases.x)
 
+        # grab header to propagate to published msgs
         header = self.mag.header
 
         # update motion model
@@ -494,7 +497,6 @@ class Subscriber(object):
         # remove old msgs
         self.imu = self.mag = self.rps = None
 
-        self.last_time = time()
 
 
     def keyboard_interupt(self, signum, frame):
