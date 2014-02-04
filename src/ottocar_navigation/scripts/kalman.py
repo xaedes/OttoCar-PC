@@ -449,7 +449,6 @@ class Subscriber(object):
         header = self.mag.header
 
         # update motion model
-
         self.motion_cv.update_dt(self.dt)
         self.motion_cv.measure(self.sensors.x[self.sensors.states['accel.x'],0])
 
