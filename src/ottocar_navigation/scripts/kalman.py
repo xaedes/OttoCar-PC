@@ -467,6 +467,30 @@ class Subscriber(object):
 
         ######### publish filtered data
 
+        if(False):
+
+            # publish imu bias
+            imu = Imu()
+            imu.header = header
+            imu.linear_acceleration.x = self.sensor_biases.x[0]
+            imu.linear_acceleration.y = self.sensor_biases.x[1]
+            imu.linear_acceleration.z = self.sensor_biases.x[2]
+            imu.angular_velocity.x = self.sensor_biases.x[3]
+            imu.angular_velocity.y = self.sensor_biases.x[4]
+            imu.angular_velocity.z = self.sensor_biases.x[5]
+            self.pub_imu_bias.publish(imu)
+
+            # publish filtered mag
+            mag = Vector3Stamped()
+            mag.header = header
+            mag.vector.x = self.sensors.x[6]
+            mag.vector.y = self.sensors.x[7]
+            mag.vector.z = self.sensors.x[8]
+            self.pub_mag.publish(mag)
+
+            # publish rps
+            self.pub_rps.publish(self.rps)
+
         # publish filtered imu
         imu = Imu()
         imu.header = header
@@ -477,28 +501,6 @@ class Subscriber(object):
         imu.angular_velocity.y = self.sensors.x[4]
         imu.angular_velocity.z = self.sensors.x[5]
         self.pub_imu.publish(imu)
-
-        # publish imu bias
-        imu = Imu()
-        imu.header = header
-        imu.linear_acceleration.x = self.sensor_biases.x[0]
-        imu.linear_acceleration.y = self.sensor_biases.x[1]
-        imu.linear_acceleration.z = self.sensor_biases.x[2]
-        imu.angular_velocity.x = self.sensor_biases.x[3]
-        imu.angular_velocity.y = self.sensor_biases.x[4]
-        imu.angular_velocity.z = self.sensor_biases.x[5]
-        self.pub_imu_bias.publish(imu)
-
-        # publish filtered mag
-        mag = Vector3Stamped()
-        mag.header = header
-        mag.vector.x = self.sensors.x[6]
-        mag.vector.y = self.sensors.x[7]
-        mag.vector.z = self.sensors.x[8]
-        self.pub_mag.publish(mag)
-
-        # publish rps
-        self.pub_rps.publish(self.rps)
 
         # publish data from motion model 
         self.pub_cv_vel.publish(self.motion_cv.x[self.motion_cv.states['velocity'],0])
