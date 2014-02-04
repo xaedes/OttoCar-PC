@@ -3,6 +3,7 @@ import rospy
 import numpy as np
 import numdifftools as nd   # sudo pip install numdifftools
 
+from time import time
 
 from std_msgs.msg import Int32
 from std_msgs.msg import Float32
@@ -265,55 +266,7 @@ class ImuSensorsBiasFilter(ImuSensorsFilter):
 
         # R: Messunsicherheit
         self.R *= 1
-
-class MotorFilter(ExtendedKalman):
-    """docstring for ImuSensorsFilter"""
-    def __init__(self, dt=1):
-        super(MotorFilter, self).__init__(n_states = 2, n_sensors = 1)
-
-        self.dt = dt    # dt in [sec]
-
-        #states:
-        #  revolutions:      0
-        #  rps:              1
-
-        #sensors:
-        #  revolutions:      0
-
-        # h: Messfunktion
-        self.h = lambda x: np.matrix(np.identity(1))
-
-
-        # F: Dynamik
-        # ... geht das überhaupt, rps durch revolutions zu predicten????? glaub nich
-        self.f = functools.partial(lambda x,u,dt: np.matrix([
-                x[0]+dt*x[1],
-                x[1]]), dt=self.dt)
-
-        # F: Dynamik
-        self.F = np.matrix([[1,dt],    #revolutions = revolutions + rps*dt
-                            [0,1]     #rps = rps
-                            ])
-
-        # Q: Unsicherheit der Dynamik 
-        self.Q = np.matrix(np.identity(self.n_states)) * 0.1    
-             
-        # P: Unsicherheit ueber Systemzustand   
-        self.P *= 0.1
-
-        # R: Messunsicherheit
-        self.R *= 1
-
-
-
-    def update_dt(self,dt): # dt in [sec]
-        self.F[0,1] = dt;
-
-    def measure(self,revolutions,rps):
-        Z = np.matrix([revolutions,rps]).getT()
-
-        self.predict()
-        self.update(Z)
+ 
 
 class Subscriber(object):
     """docstring for Subscriber"""
@@ -325,22 +278,23 @@ class Subscriber(object):
 
         self.sensors = ImuSensorsFilter()
         self.sensor_biases = ImuSensorsBiasFilter()
-        self.motor = MotorFilter(self.dt)    
-
 
         # Publishers
         self.pub_imu = rospy.Publisher('/imu/data_filtered', Imu)
         self.pub_imu_bias = rospy.Publisher('/imu/data_biases', Imu)
         self.pub_mag = rospy.Publisher('/imu/mag_filtered', Vector3Stamped)
-        self.pub_rps = rospy.Publisher('/rps_filtered', Float32)
+        self.pub_rps = rospy.Publisher('/rps', Float32)
 
         # Subscribers
         rospy.Subscriber('/imu/data_raw', Imu, self.callback_imu)
         rospy.Subscriber('/imu/mag', Vector3Stamped, self.callback_mag)
         rospy.Subscriber('/sensor_distance', Int32, self.callback_revolutions)
 
+        self.rps_gain = 0.25
+
         self.imu = self.mag = self.revolutions = None
-        self.last_revolutions = self.last_time = None
+        self.rps = 0
+        self.last_revolutions = self.last_rps_time = None
         self.lock = threading.Lock()
 
         rospy.spin()
@@ -348,9 +302,20 @@ class Subscriber(object):
     def callback_revolutions(self, msg):
         self.revolutions = msg.data
 
-        self.lock.acquire()
-        self.measure()
-        self.lock.release()
+        # update rps 
+        if(self.last_revolutions==None):
+            self.last_revolutions=self.revolutions
+        if(self.last_rps_time==None):
+            self.last_rps_time=time()
+
+        dt = time()-self.last_rps_time
+        # dt = 1./80.
+        if(dt!=0):
+            rps_now = (self.revolutions - self.last_revolutions) / dt
+            self.rps = self.rps_gain * rps_now + (1-self.rps_gain) * self.rps
+
+        self.last_revolutions=self.revolutions                    
+        self.last_rps_time=time()
 
     def callback_imu(self, msg):
         self.imu = msg
@@ -372,36 +337,19 @@ class Subscriber(object):
         if((self.mag==None)or(self.imu==None)or(self.revolutions==None)):
             return
 
-        if(self.last_revolutions==None):
-            self.last_revolutions=self.revolutions
 
-        if(self.last_time==None):
-            self.last_time=self.imu.header.stamp.to_sec()
-        # else:
-            # self.dt=
-
-        # update bias if revolutions don't change, i.e. the car is standing still
-        if(self.revolutions-self.last_revolutions == 0):
+        # update bias if car stands still (rps==0)
+        if(self.rps == 0):
             self.sensor_biases.measure(self.imu,self.mag)
 
         # update sensors
         self.sensors.measure(self.imu,self.mag,self.sensor_biases.x)
 
-        # update motor
-        if(self.dt!=0):
-            rps = (self.revolutions - self.last_revolutions) / self.dt # that is nasty, extended kalman filter needed...
-        else:
-            rps = self.motor.x[1]
-
-        # print self.motor.x
-        # self.motor.x[1] = rps
-
-        self.motor.measure(self.revolutions,rps)
-
-
         header = self.mag.header
 
-        # publish filtered data
+        ######### publish filtered data
+
+        # publish filtered imu
         imu = Imu()
         imu.header = header
         imu.linear_acceleration.x = self.sensors.x[0]
@@ -412,6 +360,7 @@ class Subscriber(object):
         imu.angular_velocity.z = self.sensors.x[5]
         self.pub_imu.publish(imu)
 
+        # publish imu bias
         imu = Imu()
         imu.header = header
         imu.linear_acceleration.x = self.sensor_biases.x[0]
@@ -422,6 +371,7 @@ class Subscriber(object):
         imu.angular_velocity.z = self.sensor_biases.x[5]
         self.pub_imu_bias.publish(imu)
 
+        # publish filtered mag
         mag = Vector3Stamped()
         mag.header = header
         mag.vector.x = self.sensors.x[6]
@@ -429,9 +379,10 @@ class Subscriber(object):
         mag.vector.z = self.sensors.x[8]
         self.pub_mag.publish(mag)
 
-        self.pub_rps.publish(self.motor.x[1])
+        # publish rps
+        self.pub_rps.publish(self.rps)
 
-        self.last_revolutions=self.revolutions
+
 
         # remove old msgs
         self.imu = self.mag = self.revolutions = None
