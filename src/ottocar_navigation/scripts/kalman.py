@@ -334,6 +334,9 @@ class MotionModelCV(ExtendedKalman):
         Z = np.matrix([acceleration]).getT()
 
         self.predict()
+
+        self.x[1,0] = acceleration
+        
         self.update(Z)
 
 class Subscriber(object):
