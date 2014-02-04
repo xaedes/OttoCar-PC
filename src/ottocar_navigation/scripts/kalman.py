@@ -297,15 +297,16 @@ class MotionModelCV(ExtendedKalman):
     """Constant Velocity linear motion model"""
     #http://www.isif.org/fusion/proceedings/fusion08CD/papers/1569107835.pdf
     def __init__(self, dt):
-        super(MotionModelCV, self).__init__(n_states = 2, n_sensors = 1)
+        super(MotionModelCV, self).__init__(n_states = 3, n_sensors = 1)
         #states:
         #  velocity      0
         #  acceleration  1
+        #  distance      2
 
         #sensors:
         #  acceleration  0
 
-        self.states = {'velocity': 0, 'acceleration': 1}
+        self.states = {'velocity': 0, 'acceleration': 1, 'distance': 2}
         self.sensors = {'acceleration': 0}
 
         # self.x[1,0] = 10
@@ -313,8 +314,10 @@ class MotionModelCV(ExtendedKalman):
         self.dt = dt
         # F: Dynamik
         self.f_dt = lambda x,u,dt: np.array([
-            [x[0,0] + dt*x[1,0]], # velocity     = velocity + dt * acceleration
-            [0]])                 # acceleration = 0
+            [x[0,0] + dt*x[1,0]],                   # velocity     = velocity + dt * acceleration
+            [0],                                    # acceleration = 0
+            [x[2,0] + dt*x[0,0] + dt*dt*x[1,0]],    # position     = position + dt * velocity + dt * dt * acceleration
+            ])                   
         self.f = functools.partial(self.f_dt, dt=self.dt)
 
         # h: Messfunktion
