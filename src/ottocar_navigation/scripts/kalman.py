@@ -138,6 +138,8 @@ class ExtendedKalman(object):
         self.B = np.matrix(np.identity(n_states))
 
         # h: Messfunktion
+        # function h can be used to compute the predicted measurement from the predicted state
+        #  (http://www.lr.tudelft.nl/fileadmin/Faculteit/LR/Organisatie/Afdelingen_en_Leerstoelen/Afdeling_AEWE/Applied_Sustainable_Science_Engineering_and_Technology/Education/AE4-T40_Kites,_Smart_kites,_Control_and_Energy_Production/doc/Lecture5.ppt)
         self.h = lambda x: np.matrix(np.zeros(shape=(n_sensors, 1)))
 
         # R: Messunsicherheit
@@ -264,7 +266,7 @@ class ImuSensorsBiasFilter(ImuSensorsFilter):
         # R: Messunsicherheit
         self.R *= 1
 
-class MotorFilter(Kalman):
+class MotorFilter(ExtendedKalman):
     """docstring for ImuSensorsFilter"""
     def __init__(self, dt=1):
         super(MotorFilter, self).__init__(n_states = 2, n_sensors = 1)
@@ -277,12 +279,17 @@ class MotorFilter(Kalman):
 
         #sensors:
         #  revolutions:      0
-        #  rps:              1
 
-        # H: Messmatrix
-        self.H = np.matrix( '1 0;'    #revolutions
-                            '0 1'     #rps
-                            )
+        # h: Messfunktion
+        self.h = lambda x: np.matrix(np.identity(1))
+
+
+        # F: Dynamik
+        # ... geht das überhaupt, rps durch revolutions zu predicten????? glaub nich
+        self.f = functools.partial(lambda x,u,dt: np.matrix([
+                x[0]+dt*x[1],
+                x[1]]), dt=self.dt)
+
         # F: Dynamik
         self.F = np.matrix([[1,dt],    #revolutions = revolutions + rps*dt
                             [0,1]     #rps = rps
@@ -296,6 +303,8 @@ class MotorFilter(Kalman):
 
         # R: Messunsicherheit
         self.R *= 1
+
+
 
     def update_dt(self,dt): # dt in [sec]
         self.F[0,1] = dt;
