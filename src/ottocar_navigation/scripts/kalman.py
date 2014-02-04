@@ -12,7 +12,7 @@ from sensor_msgs.msg import Imu
 
 import functools
 import sys
-
+import signal
 
 import threading
 
@@ -315,6 +315,10 @@ class MotionModelCV(ExtendedKalman):
         # function h can be used to compute the predicted measurement from the predicted state
         self.h = lambda x: np.matrix([x[1,0]])
 
+    def update_dt(self,dt):
+        self.dt = dt
+        self.f = functools.partial(self.f_dt, dt=self.dt)
+
     def measure(self,acceleration):
         # print acceleration
         # Z = np.matrix([[acceleration]])
@@ -323,14 +327,20 @@ class MotionModelCV(ExtendedKalman):
         self.predict()
         self.update(Z)
 
-
 class Subscriber(object):
     """docstring for Subscriber"""
     def __init__(self):
         super(Subscriber, self).__init__()
         rospy.init_node('kalman', anonymous=True)
 
-        self.dt = 1./80. # topic rate ~ 80hz
+
+        self.run = True
+        self.pause = False
+        self.rate = 40
+        signal.signal(signal.SIGINT, self.keyboard_interupt)
+        
+        self.dt = 1./min(self.rate,40.) # topic rate ~ 40hz
+
 
         self.sensors = ImuSensorsFilter()
         self.sensor_biases = ImuSensorsBiasFilter()
@@ -352,13 +362,16 @@ class Subscriber(object):
         rospy.Subscriber('/sensor_distance', Int32, self.callback_revolutions)
 
         self.rps_gain = 0.25
+        self.dt_gain = 0.125
 
         self.imu = self.mag = self.revolutions = None
         self.rps = 0
-        self.last_revolutions = self.last_rps_time = None
+        self.last_revolutions = self.last_rps_time = self.last_time = None
         self.lock = threading.Lock()
 
-        rospy.spin()
+
+
+        self.spin()
 
     def callback_revolutions(self, msg):
         self.revolutions = msg.data
@@ -370,7 +383,6 @@ class Subscriber(object):
             self.last_rps_time=time()
 
         dt = time()-self.last_rps_time
-        # dt = 1./80.
         if(dt!=0):
             rps_now = (self.revolutions - self.last_revolutions) / dt
             self.rps = self.rps_gain * rps_now + (1-self.rps_gain) * self.rps
@@ -381,16 +393,19 @@ class Subscriber(object):
     def callback_imu(self, msg):
         self.imu = msg
 
-        self.lock.acquire()
-        self.measure()
-        self.lock.release()
 
     def callback_mag(self, msg):
         self.mag = msg
 
-        self.lock.acquire()
-        self.measure()
-        self.lock.release()
+
+
+    def spin(self):
+        # print "Setting up rate ", self.rate, "hz"
+        r = rospy.Rate(self.rate)
+        while(self.run):
+            self.measure()
+            # self.pub_mag.publish(Vector3Stamped())
+            r.sleep()
 
 
     def measure(self):
@@ -398,6 +413,13 @@ class Subscriber(object):
         if((self.mag==None)or(self.imu==None)or(self.revolutions==None)):
             return
 
+        # filter dt
+        if(self.last_time == None):
+            self.last_time = time()
+        dt_now = time()-self.last_time
+        self.dt = self.dt_gain * dt_now + (1-self.dt_gain) * self.dt
+
+        # print 1/self.dt
 
         # update bias if car stands still (rps==0)
         if(self.rps == 0):
@@ -453,8 +475,12 @@ class Subscriber(object):
         # remove old msgs
         self.imu = self.mag = self.revolutions = None
 
+        self.last_time = time()
 
-        
+
+    def keyboard_interupt(self, signum, frame):
+        self.run = False
+        print " closing...\n"
 
 
 if __name__ == '__main__':
