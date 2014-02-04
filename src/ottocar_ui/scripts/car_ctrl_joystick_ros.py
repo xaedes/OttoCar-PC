@@ -132,7 +132,7 @@ class Node(object):
 
     def keyboard_interupt(self, signum, frame):
         self.run = False
-        print " closing..."
+        print " closing...\n"
 
     def spin(self):
         r = rospy.Rate(20) # 10hz
