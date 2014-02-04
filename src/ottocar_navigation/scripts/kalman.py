@@ -381,6 +381,7 @@ class Subscriber(object):
         self.last_revolutions = self.last_rps_time = self.last_time = None
 
 
+        self.counter = 0
 
         self.spin()
 
@@ -445,9 +446,12 @@ class Subscriber(object):
         dt_now = time()-self.last_time
         self.dt = self.dt_gain * dt_now + (1-self.dt_gain) * self.dt
 
-        # print 1/self.dt
+        self.counter += 1
+        if(self.counter==10):
+            print 1/self.dt
+            self.counter=0
 
-        # update bias if car stands still (rps<1)
+        # update bias if car stands still (rps < 1)
         if(self.rps < 1):
             self.sensor_biases.measure(self.imu,self.mag)
 
