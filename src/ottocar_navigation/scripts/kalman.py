@@ -371,7 +371,8 @@ class Subscriber(object):
         # Subscribers
         rospy.Subscriber('/imu/data_raw', Imu, self.callback_imu)
         rospy.Subscriber('/imu/mag', Vector3Stamped, self.callback_mag)
-        rospy.Subscriber('/sensor_distance', Int32, self.callback_revolutions)
+        rospy.Subscriber('/sensor_motor_revolutions', Int32, self.callback_revolutions)
+        rospy.Subscriber('/sensor_motor_rps', Float32, self.callback_rps)
 
         self.rps_gain = 0.25
         self.dt_gain = 0.125
@@ -398,33 +399,17 @@ class Subscriber(object):
 
         print "reset"
 
+    def callback_rps(self, msg):
+        self.rps = msg.data
+
     def callback_revolutions(self, msg):
         self.revolutions = msg.data
-
-        # update rps 
-        if(self.last_revolutions==None):
-            self.last_revolutions=self.revolutions
-        if(self.last_rps_time==None):
-            self.last_rps_time=time()
-
-        dt = time()-self.last_rps_time
-        if(dt!=0):
-            rps_now = (self.revolutions - self.last_revolutions) / dt
-            self.rps = self.rps_gain * rps_now + (1-self.rps_gain) * self.rps
-
-        self.last_revolutions=self.revolutions                    
-        self.last_rps_time=time()
 
     def callback_imu(self, msg):
         self.imu = msg
 
     def callback_mag(self, msg):
         self.mag = msg
-
-        if(msg.header.seq == 9379):
-            self.reset()
-
-
 
     def spin(self):
         # print "Setting up rate ", self.rate, "hz"
@@ -507,7 +492,7 @@ class Subscriber(object):
         self.pub_cv_acc.publish(self.motion_cv.x[self.motion_cv.states['acceleration'],0])
 
         # remove old msgs
-        self.imu = self.mag = self.revolutions = None
+        self.imu = self.mag = self.rps = None
 
         self.last_time = time()
 
