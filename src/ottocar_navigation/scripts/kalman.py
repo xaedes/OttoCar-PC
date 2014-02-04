@@ -447,8 +447,8 @@ class Subscriber(object):
 
         # print 1/self.dt
 
-        # update bias if car stands still (rps==0)
-        if(self.rps == 0):
+        # update bias if car stands still (rps<1)
+        if(self.rps < 1):
             self.sensor_biases.measure(self.imu,self.mag)
 
         # update sensors
