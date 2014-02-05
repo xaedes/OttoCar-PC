@@ -341,9 +341,7 @@ class MotionModelCV(ExtendedKalman):
 
 
     def update_dt(self,dt):
-        # self.dt = dt
-        # self.f = functools.partial(self.f_dt, dt=self.dt)
-        pass
+        self.dt = dt
 
     def measure(self,acceleration):
         # print acceleration
@@ -421,9 +419,11 @@ class Subscriber(object):
         self.pub_imu_bias = rospy.Publisher('/imu/data_biases', Imu)
         self.pub_mag = rospy.Publisher('/imu/mag_filtered', Vector3Stamped)
         self.pub_rps = rospy.Publisher('/rps', Float32)
+        self.pub_dt = rospy.Publisher('/kalman_dt', Float32)
 
         self.pub_cv_vel = rospy.Publisher('/motion/cv/velocity', Float32)
         self.pub_cv_acc = rospy.Publisher('/motion/cv/acceleration', Float32)
+        self.pub_cv_dis = rospy.Publisher('/motion/cv/distance', Float32)
 
         # Subscribers
         rospy.Subscriber('/imu/data_raw', Imu, self.callback_imu)
@@ -432,7 +432,7 @@ class Subscriber(object):
         rospy.Subscriber('/sensor_motor_rps', Float32, self.callback_rps)
 
         self.rps_gain = 0.25
-        self.dt_gain = 0.125
+        self.dt_gain = 0.125 / 2
 
         self.imu = self.mag = self.revolutions = None
         self.rps = 0
@@ -484,7 +484,19 @@ class Subscriber(object):
 
         # update sample rate and dt
         self.measure_sample_rate.add_sample()
-        self.dt = 1/float(self.measure_sample_rate)
+        # self.dt = 1/float(self.measure_sample_rate)
+
+        # filter dt
+        if(self.last_time == None):
+            self.last_time = time()
+
+        dt_now = time()-self.last_time
+        self.last_time = time()
+        # wenn neuer wert ganz stark abweicht vom alten, schwaeche den gain factor ab
+        confidence = pow(1./2000.,abs(dt_now - self.dt))
+        self.dt = confidence * self.dt_gain * dt_now + (1-confidence * self.dt_gain) * self.dt
+
+        self.pub_dt.publish(self.dt)
 
         self.counter += 1
         if(self.counter==10):
@@ -508,7 +520,6 @@ class Subscriber(object):
         ######### publish filtered data
 
         if(False):
-
             # publish imu bias
             imu = Imu()
             imu.header = header
@@ -531,20 +542,21 @@ class Subscriber(object):
             # publish rps
             self.pub_rps.publish(self.rps)
 
-        # publish filtered imu
-        imu = Imu()
-        imu.header = header
-        imu.linear_acceleration.x = self.sensors.x[0]
-        imu.linear_acceleration.y = self.sensors.x[1]
-        imu.linear_acceleration.z = self.sensors.x[2]
-        imu.angular_velocity.x = self.sensors.x[3]
-        imu.angular_velocity.y = self.sensors.x[4]
-        imu.angular_velocity.z = self.sensors.x[5]
-        self.pub_imu.publish(imu)
+            # publish filtered imu
+            imu = Imu()
+            imu.header = header
+            imu.linear_acceleration.x = self.sensors.x[0,0]
+            imu.linear_acceleration.y = self.sensors.x[1,0]
+            imu.linear_acceleration.z = self.sensors.x[2,0]
+            imu.angular_velocity.x = self.sensors.x[3,0]
+            imu.angular_velocity.y = self.sensors.x[4,0]
+            imu.angular_velocity.z = self.sensors.x[5,0]
+            self.pub_imu.publish(imu)
 
         # publish data from motion model 
         self.pub_cv_vel.publish(self.motion_cv.x[self.motion_cv.states['velocity'],0])
         self.pub_cv_acc.publish(self.motion_cv.x[self.motion_cv.states['acceleration'],0])
+        self.pub_cv_dis.publish(self.motion_cv.x[self.motion_cv.states['distance'],0])
 
         # remove old msgs
         self.imu = self.mag = self.rps = None
