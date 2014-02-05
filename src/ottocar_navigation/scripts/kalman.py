@@ -299,14 +299,14 @@ class MotionModelCV(ExtendedKalman):
     def __init__(self, dt):
         super(MotionModelCV, self).__init__(n_states = 3, n_sensors = 1)
         #states:
-        #  velocity      0
-        #  acceleration  1
+        #  acceleration  0
+        #  velocity      1
         #  distance      2
 
         #sensors:
         #  acceleration  0
 
-        self.states = {'velocity': 0, 'acceleration': 1, 'distance': 2}
+        self.states = {'acceleration': 0, 'velocity': 1, 'distance': 2}
         self.sensors = {'acceleration': 0}
 
         # self.x[1,0] = 10
@@ -314,14 +314,14 @@ class MotionModelCV(ExtendedKalman):
         self.dt = dt
         # F: Dynamik
         self.f = lambda x,u: np.array([
-            [x[0,0] + self.dt*x[1,0]],                              # velocity     = velocity + dt * acceleration
             [0],                                                    # acceleration = 0
-            [x[2,0] + self.dt*x[0,0] + self.dt*self.dt*x[1,0]],     # position     = position + dt * velocity + dt * dt * acceleration
+            [x[1,0] + self.dt*x[0,0]],                              # velocity     = velocity + dt * acceleration
+            [x[2,0] + self.dt*x[1,0] + self.dt*self.dt*x[0,0]],     # position     = position + dt * velocity + dt * dt * acceleration
             ])
 
         # h: Messfunktion
         # function h can be used to compute the predicted measurement from the predicted state
-        self.h = lambda x: np.array([x[1,0]])
+        self.h = lambda x: np.array([x[0,0]])
 
     def update_dt(self,dt):
         # self.dt = dt
@@ -335,7 +335,7 @@ class MotionModelCV(ExtendedKalman):
 
         self.predict()
 
-        self.x[1,0] = acceleration
+        self.x[0,0] = acceleration
         
         self.update(Z)
 
