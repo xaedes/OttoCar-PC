@@ -35,7 +35,7 @@ class Kalman(object):
         self.F = np.matrix(np.identity(n_states))
 
         # Q: Dynamik Unsicherheit
-        self.Q = np.matrix(np.zeros(shape=(n_states,n_states)))
+        self.Q = np.matrix(np.identity(n_states))
 
         # u: externe Beeinflussung des Systems
         self.u = np.matrix(np.zeros(shape=(n_states,1)))
@@ -337,9 +337,6 @@ class MotionModelCV(ExtendedKalman):
         self.J_h_fun = lambda x: np.matrix([
             [1,0,0]
             ])
-
-
-
     def update_dt(self,dt):
         self.dt = dt
 
@@ -353,6 +350,8 @@ class MotionModelCV(ExtendedKalman):
         self.x[0,0] = acceleration
         
         self.update(Z)
+
+class MotionModelCV(ExtendedKalman):
 
 class MeasureSampleRate(object):
     """docstring for MeasureSampleRate"""
