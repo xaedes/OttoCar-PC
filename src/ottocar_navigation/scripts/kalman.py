@@ -313,20 +313,20 @@ class MotionModelCV(ExtendedKalman):
 
         self.dt = dt
         # F: Dynamik
-        self.f_dt = lambda x,u,dt: np.array([
-            [x[0,0] + dt*x[1,0]],                   # velocity     = velocity + dt * acceleration
-            [0],                                    # acceleration = 0
-            [x[2,0] + dt*x[0,0] + dt*dt*x[1,0]],    # position     = position + dt * velocity + dt * dt * acceleration
-            ])                   
-        self.f = functools.partial(self.f_dt, dt=self.dt)
+        self.f = lambda x,u: np.array([
+            [x[0,0] + self.dt*x[1,0]],                              # velocity     = velocity + dt * acceleration
+            [0],                                                    # acceleration = 0
+            [x[2,0] + self.dt*x[0,0] + self.dt*self.dt*x[1,0]],     # position     = position + dt * velocity + dt * dt * acceleration
+            ])
 
         # h: Messfunktion
         # function h can be used to compute the predicted measurement from the predicted state
         self.h = lambda x: np.array([x[1,0]])
 
     def update_dt(self,dt):
-        self.dt = dt
-        self.f = functools.partial(self.f_dt, dt=self.dt)
+        # self.dt = dt
+        # self.f = functools.partial(self.f_dt, dt=self.dt)
+        pass
 
     def measure(self,acceleration):
         # print acceleration
