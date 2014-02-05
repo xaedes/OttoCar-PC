@@ -339,6 +339,45 @@ class MotionModelCV(ExtendedKalman):
         
         self.update(Z)
 
+class MeasureSampleRate(object):
+    """docstring for MeasureSampleRate"""
+    def __init__(self, update_interval = 10, gain = 0.5):
+        super(MeasureSampleRate, self).__init__()
+        self.sample_rate = 1
+        self.gain = gain
+        self.update_interval = update_interval #in number of samples
+        self.first_samplerate = False
+        self.n_samples = 0
+        self.last_time = rospy.Time.now().to_sec()
+
+    def add_sample(self):
+        self.n_samples = (self.n_samples + 1) % self.update_interval
+        if self.n_samples == 0:
+            self.update_sample_rate(self.update_interval)
+
+    def update_sample_rate(self, n_new_samples = 1):
+        dtime = rospy.Time.now().to_sec() - self.last_time
+        self.last_time = rospy.Time.now().to_sec()
+
+        current_sample_rate = n_new_samples / dtime
+
+        if self.first_samplerate:
+            self.first_samplerate = False
+            self.sample_rate = current_sample_rate
+
+        self.sample_rate = self.sample_rate * (1-self.gain) + current_sample_rate * self.gain        
+
+        return self.sample_rate
+
+    def __complex__(self):
+        return complex(self.sample_rate)
+    def __int__(self):
+        return int(self.sample_rate)
+    def __long__(self):
+        return long(self.sample_rate)
+    def __float__(self):
+        return float(self.sample_rate)
+
 class Subscriber(object):
     """docstring for Subscriber"""
     def __init__(self):
@@ -348,11 +387,12 @@ class Subscriber(object):
 
         self.run = True
         self.pause = False
-        self.rate = 40
+        self.rate = 40.
         signal.signal(signal.SIGINT, self.keyboard_interupt)
         
         self.dt = 1./min(self.rate,40.) # topic rate ~ 40hz
 
+        self.measure_sample_rate = MeasureSampleRate()
 
         self.sensors = ImuSensorsFilter()
         self.sensor_biases = ImuSensorsBiasFilter()
@@ -425,17 +465,13 @@ class Subscriber(object):
         if((self.mag==None)or(self.imu==None)or(self.rps==None)):
             return
 
-        # filter dt
-        if(self.last_time == None):
-            self.last_time = time()
-        dt_now = time()-self.last_time
-        self.last_time = time()
-        self.dt = self.dt_gain * dt_now + (1-self.dt_gain) * self.dt
+        # update sample rate and dt
+        self.measure_sample_rate.add_sample()
+        self.dt = 1/float(self.measure_sample_rate)
 
-        # periodical print of refresh rate
         self.counter += 1
         if(self.counter==10):
-            print 1/self.dt
+            print float(self.measure_sample_rate)
             self.counter=0
 
         # update bias if car stands still (rps < 1)
