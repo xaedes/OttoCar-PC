@@ -137,6 +137,10 @@ class ExtendedKalman(object):
         # x,u,and return type are np.matrix
         self.f = lambda x,u: np.matrix(np.identity(n_states)) * x
 
+        # Jacobi Matrix fuer f als Funktion zum auswerten
+        # conversions between np.array and np.matrix are necessary because nd.Jacobian needs np.array, but we use np.matrix everywhere
+        self.J_f_fun = lambda x: np.matrix(nd.Jacobian(lambda x: self.f(x, self.u))(np.array(x)))
+
         # Q: Dynamik Unsicherheit
         # self.Q = np.matrix(np.zeros(shape=(n_states,n_states)))
         self.Q = np.matrix(np.identity(n_states)) 
@@ -152,6 +156,11 @@ class ExtendedKalman(object):
         # function h can be used to compute the predicted measurement from the predicted state
         #  (http://www.lr.tudelft.nl/fileadmin/Faculteit/LR/Organisatie/Afdelingen_en_Leerstoelen/Afdeling_AEWE/Applied_Sustainable_Science_Engineering_and_Technology/Education/AE4-T40_Kites,_Smart_kites,_Control_and_Energy_Production/doc/Lecture5.ppt)
         self.h = lambda x: np.matrix(np.zeros(shape=(n_sensors, 1)))
+
+        # Jacobi Matrix fuer h als Funktion zum auswerten
+        # conversions between np.array and np.matrix are necessary because nd.Jacobian needs np.array, but we use np.matrix everywhere
+        self.J_h_fun = lambda x: np.matrix(nd.Jacobian(self.h)(np.array(x)))
+
 
         # R: Messunsicherheit
         self.R = np.matrix(np.identity(n_sensors))
@@ -180,8 +189,7 @@ class ExtendedKalman(object):
 # 
         # J_h:Jacobian of function h evaluated at current x
         # conversions between np.array and np.matrix are necessary because nd.Jacobian needs np.array, but we use np.matrix everywhere
-        J_h = nd.Jacobian(self.h)
-        J_h = np.matrix(J_h(np.array(self.x)))
+        J_h = self.J_h_fun(self.x)
 
         # S: Residualkovarianz (http://services.eng.uts.edu.au/~sdhuang/Extended%20Kalman%20Filter_Shoudong.pdf Eq. 9)
         S = J_h  * self.P * J_h.getT() + self.R
@@ -203,10 +211,7 @@ class ExtendedKalman(object):
         # print self.x
 
         # J_f:Jacobian of function f with respect to x evaluated at current x.
-        # conversions between np.array and np.matrix are necessary because nd.Jacobian only works with np.array, but we use np.matrix everywhere
-        J_f = nd.Jacobian(lambda x: self.f(x, self.u))
-        J_f = np.matrix(J_f(np.array(self.x)))
-
+        J_f = self.J_f_fun(self.x)
 
         # print J_f
         # print self.Q
@@ -319,9 +324,21 @@ class MotionModelCV(ExtendedKalman):
             [x[2,0] + self.dt*x[1,0] + self.dt*self.dt*x[0,0]],     # position     = position + dt * velocity + dt * dt * acceleration
             ])
 
+        self.J_f_fun = lambda x: np.matrix([
+            [0,0,0],
+            [self.dt,1,0],
+            [self.dt*self.dt,self.dt,1]
+            ])
+
         # h: Messfunktion
         # function h can be used to compute the predicted measurement from the predicted state
         self.h = lambda x: np.array([x[0,0]])
+
+        self.J_h_fun = lambda x: np.matrix([
+            [1,0,0]
+            ])
+
+
 
     def update_dt(self,dt):
         # self.dt = dt
