@@ -298,52 +298,65 @@ class ImuSensorsBiasFilter(ImuSensorsFilter):
         # R: Messunsicherheit
         self.R *= 1
  
+
+ 
 class MotionModelCV(ExtendedKalman):
     """Constant Velocity linear motion model"""
     #http://www.isif.org/fusion/proceedings/fusion08CD/papers/1569107835.pdf
     def __init__(self, dt):
-        super(MotionModelCV, self).__init__(n_states = 3, n_sensors = 1)
+        super(MotionModelCV, self).__init__(n_states = 4, n_sensors = 2)
         #states:
         #  acceleration  0
         #  velocity      1
-        #  distance      2
+        #  velocity_bias 2
+        #  distance      3
 
         #sensors:
         #  acceleration  0
+        #  velocity_bias 1
 
-        self.states = {'acceleration': 0, 'velocity': 1, 'distance': 2}
-        self.sensors = {'acceleration': 0}
+        self.states = {'acceleration': 0, 'velocity': 1, 'velocity_bias': 2, 'distance': 3}
+        self.sensors = {'acceleration': 0,'velocity_bias': 1}
 
         # self.x[1,0] = 10
 
         self.dt = dt
         # F: Dynamik
         self.f = lambda x,u: np.array([
-            [0],                                                    # acceleration = 0
-            [x[1,0] + self.dt*x[0,0]],                              # velocity     = velocity + dt * acceleration
-            [x[2,0] + self.dt*x[1,0] + self.dt*self.dt*x[0,0]],     # position     = position + dt * velocity + dt * dt * acceleration
+            [0],                                                                    # acceleration  = 0
+            [x[1,0] + self.dt*x[0,0]],                                              # velocity      = velocity + dt * acceleration
+            [x[2,0]],                                                               # velocity_bias = velocity_bias
+            [self.dt*self.dt*x[0,0] + self.dt*x[1,0] - self.dt*x[2,0] + x[3,0]]     # distance      = distance + dt * (velocity-velocity_bias) + dt * dt * acceleration
             ])
 
         self.J_f_fun = lambda x: np.matrix([
-            [0,0,0],
-            [self.dt,1,0],
-            [self.dt*self.dt,self.dt,1]
+            [0,0,0,0],
+            [self.dt,1,0,0],
+            [0,0,1,0],
+            [self.dt*self.dt,self.dt,-self.dt,1]
             ])
 
         # h: Messfunktion
         # function h can be used to compute the predicted measurement from the predicted state
-        self.h = lambda x: np.array([x[0,0]])
+        self.h = lambda x: np.array([
+            [0],  # expect to see zero 
+            [0]   # expect to see zero 
+            ])
 
         self.J_h_fun = lambda x: np.matrix([
-            [1,0,0]
+            [0,0,0,0],
+            [0,0,0,0]
             ])
     def update_dt(self,dt):
         self.dt = dt
 
-    def measure(self,acceleration):
+    def measure(self,acceleration,zero_velocity):
         # print acceleration
         # Z = np.matrix([[acceleration]])
-        Z = np.matrix([acceleration]).getT()
+        if(zero_velocity==True):
+            Z = np.matrix([acceleration,self.x[self.states['velocity'],0]]).getT()
+        else:
+            Z = np.matrix([acceleration,0]).getT()
 
         self.predict()
 
@@ -351,7 +364,55 @@ class MotionModelCV(ExtendedKalman):
         
         self.update(Z)
 
-class MotionModelCV(ExtendedKalman):
+
+class OrientationFilter(ExtendedKalman):
+    """OrientationFilter"""
+    #
+    def __init__(self, dt):
+        super(OrientationFilter, self).__init__(n_states = 2, n_sensors = 1)
+        #states:
+        #  gyro  0
+        #  angle 1
+
+        #sensors:
+        #  gyro  0
+
+        self.states = {'gyro': 0, 'angle': 1}
+        self.sensors = {'gyro': 0}
+
+        self.dt = dt
+
+        # F: Dynamik
+        self.f = lambda x,u: np.array([
+            [0],                                                                    # gyro  = 0
+            [self.dt*x[0,0] + x[1,0]]                                              # angle = angle + dt * gyro
+            ])
+
+        self.J_f_fun = lambda x: np.matrix([
+            [0,0],
+            [1.,0]
+            ])
+
+        # h: Messfunktion
+        # function h can be used to compute the predicted measurement from the predicted state
+        self.h = lambda x: np.array([
+            [0]   # expect to see zero 
+            ])
+
+        self.J_h_fun = lambda x: np.matrix([
+            [0,0]
+            ])
+    def update_dt(self,dt):
+        self.dt = dt
+
+    def measure(self,gyro):
+        Z = np.matrix([gyro]).getT()
+
+        self.predict()
+
+        self.x[0,0] = gyro  # hack
+        
+        self.update(Z)
 
 class MeasureSampleRate(object):
     """docstring for MeasureSampleRate"""
@@ -411,6 +472,8 @@ class Subscriber(object):
         self.sensors = ImuSensorsFilter()
         self.sensor_biases = ImuSensorsBiasFilter()
 
+        self.orientation = OrientationFilter()
+
         self.motion_cv = MotionModelCV(dt=self.dt)
 
         # Publishers
@@ -423,6 +486,8 @@ class Subscriber(object):
         self.pub_cv_vel = rospy.Publisher('/motion/cv/velocity', Float32)
         self.pub_cv_acc = rospy.Publisher('/motion/cv/acceleration', Float32)
         self.pub_cv_dis = rospy.Publisher('/motion/cv/distance', Float32)
+
+        self.pub_orientation = rospy.Publisher('/orientation', Float32)
 
         # Subscribers
         rospy.Subscriber('/imu/data_raw', Imu, self.callback_imu)
@@ -448,6 +513,7 @@ class Subscriber(object):
         self.sensors.reset()
         self.sensor_biases.reset()
         self.motion_cv.reset()
+        self.orientation.reset()
 
         self.imu = self.mag = self.revolutions = None
         self.rps = 0
@@ -495,7 +561,7 @@ class Subscriber(object):
         confidence = pow(1./2000.,abs(dt_now - self.dt))
         self.dt = confidence * self.dt_gain * dt_now + (1-confidence * self.dt_gain) * self.dt
 
-        self.pub_dt.publish(self.dt)
+        # self.pub_dt.publish(self.dt)
 
         self.counter += 1
         if(self.counter==10):
@@ -509,53 +575,60 @@ class Subscriber(object):
         # update sensors
         self.sensors.measure(self.imu,self.mag,self.sensor_biases.x)
 
+        # update orientation filter
+        self.orientation.dt = self.dt
+        self.orientation.measure(self.sensors.x[self.sensors.states['gyro.z'],0])
+
         # grab header to propagate to published msgs
         header = self.mag.header
 
         # update motion model
-        self.motion_cv.update_dt(self.dt)
-        self.motion_cv.measure(self.sensors.x[self.sensors.states['accel.x'],0])
+
+        # self.motion_cv.update_dt(self.dt)
+        # self.motion_cv.measure(self.sensors.x[self.sensors.states['accel.x'],0],)
 
         ######### publish filtered data
 
-        if(False):
-            # publish imu bias
-            imu = Imu()
-            imu.header = header
-            imu.linear_acceleration.x = self.sensor_biases.x[0]
-            imu.linear_acceleration.y = self.sensor_biases.x[1]
-            imu.linear_acceleration.z = self.sensor_biases.x[2]
-            imu.angular_velocity.x = self.sensor_biases.x[3]
-            imu.angular_velocity.y = self.sensor_biases.x[4]
-            imu.angular_velocity.z = self.sensor_biases.x[5]
-            self.pub_imu_bias.publish(imu)
+        self.pub_orientation.publish(self.orientation.x[self.orientation.states['angle'],0])
 
-            # publish filtered mag
-            mag = Vector3Stamped()
-            mag.header = header
-            mag.vector.x = self.sensors.x[6]
-            mag.vector.y = self.sensors.x[7]
-            mag.vector.z = self.sensors.x[8]
-            self.pub_mag.publish(mag)
+        # if(False):
+        #     # publish imu bias
+        #     imu = Imu()
+        #     imu.header = header
+        #     imu.linear_acceleration.x = self.sensor_biases.x[0]
+        #     imu.linear_acceleration.y = self.sensor_biases.x[1]
+        #     imu.linear_acceleration.z = self.sensor_biases.x[2]
+        #     imu.angular_velocity.x = self.sensor_biases.x[3]
+        #     imu.angular_velocity.y = self.sensor_biases.x[4]
+        #     imu.angular_velocity.z = self.sensor_biases.x[5]
+        #     self.pub_imu_bias.publish(imu)
 
-            # publish rps
-            self.pub_rps.publish(self.rps)
+        #     # publish filtered mag
+        #     mag = Vector3Stamped()
+        #     mag.header = header
+        #     mag.vector.x = self.sensors.x[6]
+        #     mag.vector.y = self.sensors.x[7]
+        #     mag.vector.z = self.sensors.x[8]
+        #     self.pub_mag.publish(mag)
 
-            # publish filtered imu
-            imu = Imu()
-            imu.header = header
-            imu.linear_acceleration.x = self.sensors.x[0,0]
-            imu.linear_acceleration.y = self.sensors.x[1,0]
-            imu.linear_acceleration.z = self.sensors.x[2,0]
-            imu.angular_velocity.x = self.sensors.x[3,0]
-            imu.angular_velocity.y = self.sensors.x[4,0]
-            imu.angular_velocity.z = self.sensors.x[5,0]
-            self.pub_imu.publish(imu)
+        #     # publish rps
+        #     self.pub_rps.publish(self.rps)
 
-        # publish data from motion model 
-        self.pub_cv_vel.publish(self.motion_cv.x[self.motion_cv.states['velocity'],0])
-        self.pub_cv_acc.publish(self.motion_cv.x[self.motion_cv.states['acceleration'],0])
-        self.pub_cv_dis.publish(self.motion_cv.x[self.motion_cv.states['distance'],0])
+        #     # publish filtered imu
+        #     imu = Imu()
+        #     imu.header = header
+        #     imu.linear_acceleration.x = self.sensors.x[0,0]
+        #     imu.linear_acceleration.y = self.sensors.x[1,0]
+        #     imu.linear_acceleration.z = self.sensors.x[2,0]
+        #     imu.angular_velocity.x = self.sensors.x[3,0]
+        #     imu.angular_velocity.y = self.sensors.x[4,0]
+        #     imu.angular_velocity.z = self.sensors.x[5,0]
+        #     self.pub_imu.publish(imu)
+
+        # # publish data from motion model 
+        # self.pub_cv_vel.publish(self.motion_cv.x[self.motion_cv.states['velocity'],0]-self.motion_cv.x[self.motion_cv.states['velocity_bias'],0])
+        # self.pub_cv_acc.publish(self.motion_cv.x[self.motion_cv.states['acceleration'],0])
+        # self.pub_cv_dis.publish(self.motion_cv.x[self.motion_cv.states['distance'],0])
 
         # remove old msgs
         self.imu = self.mag = self.rps = None
