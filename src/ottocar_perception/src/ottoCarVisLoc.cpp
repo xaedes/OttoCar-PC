@@ -70,10 +70,15 @@ class OttoCarVisLoc{
      image_transport::Subscriber image_sub_rgb;
      ros::Publisher perfPub;
      ros::Publisher laneStatePub;
-     ros::Publisher lanesPub;
+     ros::Publisher laneLeftPub;
+     ros::Publisher laneMidPub;
+     ros::Publisher laneRightPub;
      std_msgs::Float64MultiArray perfArray;
      std_msgs::Float64MultiArray laneStateArray;
-     std_msgs::Float64MultiArray lanesArray;
+
+     std_msgs::Float64MultiArray laneLeftArray;
+     std_msgs::Float64MultiArray laneMidArray;
+     std_msgs::Float64MultiArray laneRightArray;
 
      cv::Mat rgb_img, topviewRoi_img, topview_img, H, lines_img, linesMorph_img, lanes_img_hor,lanes_img_vert, meanQuadraticNeighborKernel, meanHorizontalNeighborKernel;
      cv::Size topviewSize;
@@ -92,6 +97,7 @@ class OttoCarVisLoc{
          cv::Point2f direction;
          float confidence;
          LineType linetype;
+         std::vector<cv::Point> points;
      } StateStruct;
      // typedef std::pair<std::pair<cv::Point, cv::Point2f>, std::pair<float, LineType> > StateTriple;
      typedef std::vector<StateStruct> ListOfStateStructs;
@@ -117,7 +123,9 @@ class OttoCarVisLoc{
         image_sub_rgb = it_.subscribe("/usb_cam/image_raw", 1, &OttoCarVisLoc::imageMsgConvert_rgb, this);
         perfPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/perf", 1);
         laneStatePub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/laneState", 1);
-        lanesPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/lanes", 1);
+        laneLeftPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/lanes/left", 1);
+        laneMidPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/lanes/mid", 1);
+        laneRightPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/lanes/right", 1);
 
         if(debugMode)
         {
@@ -245,8 +253,11 @@ class OttoCarVisLoc{
         //publish lane State
         laneStatePub.publish(laneStateArray);
 
+        //publish lane data
+        laneLeftPub.publish(laneLeftArray);
+        laneRightPub.publish(laneRightArray);
+        laneMidPub.publish(laneMidArray);
 
-        lanesPub.publish(lanesArray);
 
         // show images
         if(debugMode)
@@ -402,7 +413,7 @@ class OttoCarVisLoc{
         //calc return values for module interface
         setLaneStateArray();
 
-        setLanesArray();
+        setLanesArrays();
 
         // resize for output visualisation
         cv::resize(topviewThresholdImgSmall, topviewThresholdImg, cv::Size(), resizeFactor, resizeFactor);
@@ -414,19 +425,29 @@ class OttoCarVisLoc{
         //dstLanes
     }
 
-    void setLanesArray()
+    void setLanesArrays()
     {
-        lanesArray.data.clear();
-        for(int i=0; i<polylineList.size(); i++)
+        laneLeftArray.data.clear();
+        laneMidArray.data.clear();
+        laneRightArray.data.clear();
+
+        for(int k=0; k<LaneStateStructCandidate[0].points.size(); k++)
         {
-            lanesArray.data.push_back(polylineList[i].size());
-            for(int k=0; k<polylineList[i].size(); k++)
-            {
-                lanesArray.data.push_back(polylineList[i][k].x);
-                lanesArray.data.push_back(polylineList[i][k].y);
-            }
+            laneLeftArray.data.push_back(LaneStateStructCandidate[0].points[k].x);
+            laneLeftArray.data.push_back(LaneStateStructCandidate[0].points[k].y);
+        }
+        for(int k=0; k<LaneStateStructCandidate[1].points.size(); k++)
+        {
+            laneMidArray.data.push_back(LaneStateStructCandidate[1].points[k].x);
+            laneMidArray.data.push_back(LaneStateStructCandidate[1].points[k].y);
+        }
+        for(int k=0; k<LaneStateStructCandidate[2].points.size(); k++)
+        {
+            laneRightArray.data.push_back(LaneStateStructCandidate[2].points[k].x);
+            laneRightArray.data.push_back(LaneStateStructCandidate[2].points[k].y);
         }
     }
+
     void setLaneStateArray()
     {
         float confSum = LaneStateStruct_current[0].confidence + LaneStateStruct_current[1].confidence + LaneStateStruct_current[2].confidence;
@@ -722,6 +743,10 @@ class OttoCarVisLoc{
             //set linetype
             StateStruct.linetype = polyLineTypeList[i];
 
+            for(int k=0;k<polylineList[i].size();k++){
+                StateStruct.points.push_back(polylineList[i][k]);
+            }
+
             PolyLineStateStructList.push_back(StateStruct);
         }
     }
@@ -868,6 +893,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[0].confidence = 0.5 * LaneStateStructCandidate[1].confidence + 0.5 * LaneStateStructCandidate[2].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[0].linetype = LANE_BORDER_CONTINOUS;
+                    // simulate points
+                    LaneStateStructCandidate[0].points = simulatePoints(LaneStateStructCandidate[0]);
                 }
                 else if(lineFound[1] == 0)  //mid
                 {
@@ -881,6 +908,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[1].confidence = 0.5 * LaneStateStructCandidate[0].confidence + 0.5 * LaneStateStructCandidate[2].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[1].linetype = LANE_BORDER_DASHED;
+                    // simulate points
+                    LaneStateStructCandidate[1].points = simulatePoints(LaneStateStructCandidate[1]);
                 }
                 else if(lineFound[2] == 0)  //rigth
                 {
@@ -894,6 +923,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[2].confidence = 0.5 * LaneStateStructCandidate[0].confidence + 0.5 * LaneStateStructCandidate[1].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[2].linetype = LANE_BORDER_CONTINOUS;
+                    // simulate points
+                    LaneStateStructCandidate[2].points = simulatePoints(LaneStateStructCandidate[2]);
                 }
             }
             // simulate two lines
@@ -911,6 +942,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[1].confidence = LaneStateStructCandidate[0].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[1].linetype = LANE_BORDER_DASHED;
+                    // simulate points
+                    LaneStateStructCandidate[1].points = simulatePoints(LaneStateStructCandidate[1]);
 
                     //update point
                     LaneStateStructCandidate[2].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH;
@@ -922,6 +955,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[2].confidence = LaneStateStructCandidate[0].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[2].linetype = LANE_BORDER_CONTINOUS;
+                    // simulate points
+                    LaneStateStructCandidate[2].points = simulatePoints(LaneStateStructCandidate[2]);
                 }
                 else if(lineFound[1] == 1)  //mid
                 {
@@ -935,6 +970,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[0].confidence = LaneStateStructCandidate[1].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[0].linetype = LANE_BORDER_CONTINOUS;
+                    // simulate points
+                    LaneStateStructCandidate[0].points = simulatePoints(LaneStateStructCandidate[0]);
 
                     //update point
                     LaneStateStructCandidate[2].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH;
@@ -946,6 +983,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[2].confidence = LaneStateStructCandidate[1].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[2].linetype = LANE_BORDER_CONTINOUS;
+                    // simulate points
+                    LaneStateStructCandidate[2].points = simulatePoints(LaneStateStructCandidate[2]);
                 }
                 else if(lineFound[2] == 1)  //rigth
                 {
@@ -959,6 +998,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[1].confidence = LaneStateStructCandidate[2].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[1].linetype = LANE_BORDER_DASHED;
+                    // simulate points
+                    LaneStateStructCandidate[1].points = simulatePoints(LaneStateStructCandidate[1]);
 
                     //update point
                     LaneStateStructCandidate[0].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH;
@@ -970,6 +1011,8 @@ class OttoCarVisLoc{
                     LaneStateStructCandidate[0].confidence = LaneStateStructCandidate[2].confidence;
                     //lane type keeps the same
                     LaneStateStructCandidate[0].linetype = LANE_BORDER_CONTINOUS;
+                    // simulate points
+                    LaneStateStructCandidate[0].points = simulatePoints(LaneStateStructCandidate[0]);
                 }
             }
         }
@@ -991,8 +1034,22 @@ class OttoCarVisLoc{
                 //lane type keeps the same
                 LaneStateStructCandidate[i].linetype = LaneStateStruct_current[i].linetype;
 
+                // simulate points
+                LaneStateStructCandidate[i].points = simulatePoints(LaneStateStructCandidate[i]);
             }
-        }
+        } 
+    }
+
+    std::vector<cv::Point> simulatePoints(StateStruct stateStruct) 
+    {
+        std::vector<cv::Point> points;
+
+        cv::Point a(stateStruct.projectedToBaseLine.x,stateStruct.projectedToBaseLine.y);
+        cv::Point b(stateStruct.projectedToBaseLine.x+stateStruct.direction.x*200,stateStruct.projectedToBaseLine.y+stateStruct.direction.y*200);
+        points.push_back(a);
+        points.push_back(b);
+
+        return points;
     }
 
 
