@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 import numpy as np
-import numdifftools as nd   # sudo pip install numdifftools
+# import numdifftools as nd   # sudo pip install numdifftools
 
 from time import time
 
@@ -139,7 +139,7 @@ class ExtendedKalman(object):
 
         # Jacobi Matrix fuer f als Funktion zum auswerten
         # conversions between np.array and np.matrix are necessary because nd.Jacobian needs np.array, but we use np.matrix everywhere
-        self.J_f_fun = lambda x: np.matrix(nd.Jacobian(lambda x: self.f(x, self.u))(np.array(x)))
+        # self.J_f_fun = lambda x: np.matrix(nd.Jacobian(lambda x: self.f(x, self.u))(np.array(x)))
 
         # Q: Dynamik Unsicherheit
         # self.Q = np.matrix(np.zeros(shape=(n_states,n_states)))
@@ -159,7 +159,7 @@ class ExtendedKalman(object):
 
         # Jacobi Matrix fuer h als Funktion zum auswerten
         # conversions between np.array and np.matrix are necessary because nd.Jacobian needs np.array, but we use np.matrix everywhere
-        self.J_h_fun = lambda x: np.matrix(nd.Jacobian(self.h)(np.array(x)))
+        # self.J_h_fun = lambda x: np.matrix(nd.Jacobian(self.h)(np.array(x)))
 
 
         # R: Messunsicherheit
@@ -472,7 +472,7 @@ class Subscriber(object):
         self.sensors = ImuSensorsFilter()
         self.sensor_biases = ImuSensorsBiasFilter()
 
-        self.orientation = OrientationFilter()
+        self.orientation = OrientationFilter(dt=self.dt)
 
         self.motion_cv = MotionModelCV(dt=self.dt)
 
