@@ -70,8 +70,10 @@ class OttoCarVisLoc{
      image_transport::Subscriber image_sub_rgb;
      ros::Publisher perfPub;
      ros::Publisher laneStatePub;
+     ros::Publisher lanesPub;
      std_msgs::Float64MultiArray perfArray;
      std_msgs::Float64MultiArray laneStateArray;
+     std_msgs::Float64MultiArray lanesArray;
 
      cv::Mat rgb_img, topviewRoi_img, topview_img, H, lines_img, linesMorph_img, lanes_img_hor,lanes_img_vert, meanQuadraticNeighborKernel, meanHorizontalNeighborKernel;
      cv::Size topviewSize;
@@ -84,9 +86,19 @@ class OttoCarVisLoc{
      std::vector<std::pair<float, float> > polyLinesParamList; // <lineLength, angleChangeConf>
      std::vector<LineType> polyLineTypeList;
 
-     typedef std::pair<std::pair<cv::Point, cv::Point2f>, std::pair<float, LineType> > StateTriple;
-     typedef std::vector<StateTriple> ListOfStateTriples;
-     ListOfStateTriples PolyLineStateTripleList, BorderLeftCandidateList, BorderMidCandidateList, BorderRightCandidateList, LaneStateTripleCandidate, LaneStateTriple_current, LaneStateTriple_last; // Laneborder_left ; LaneBorder_mid; Laneborder_right
+     typedef struct StateStruct_
+     {
+         cv::Point projectedToBaseLine;
+         cv::Point2f direction;
+         float confidence;
+         LineType linetype;
+     } StateStruct;
+     // typedef std::pair<std::pair<cv::Point, cv::Point2f>, std::pair<float, LineType> > StateTriple;
+     typedef std::vector<StateStruct> ListOfStateStructs;
+     // typedef std::vector<StateStruct> ListOfStateStructs;
+     ListOfStateStructs PolyLineStateStructList, BorderLeftCandidateList, BorderMidCandidateList, BorderRightCandidateList, LaneStateStructCandidate, LaneStateStruct_current, LaneStateStruct_last; // Laneborder_left ; LaneBorder_mid; Laneborder_right
+    
+
      // point; vec; confidence ; linetype
 
     public:
@@ -98,13 +110,14 @@ class OttoCarVisLoc{
         loadDoubleMatFromFile(H, projMatFilename, 3, 3);
         loadCalibConfigFromFile(topviewSize, carPos, configFilename);
 
-        LaneStateTriple_current.clear();
-        LaneStateTriple_last.clear();
+        LaneStateStruct_current.clear();
+        LaneStateStruct_last.clear();
 
         // Subscrive to input video feed and publish output
         image_sub_rgb = it_.subscribe("/usb_cam/image_raw", 1, &OttoCarVisLoc::imageMsgConvert_rgb, this);
-        perfPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/perf", 100);
-        laneStatePub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/laneState", 100);
+        perfPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/perf", 1);
+        laneStatePub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/laneState", 1);
+        lanesPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/lanes", 1);
 
         if(debugMode)
         {
@@ -232,6 +245,9 @@ class OttoCarVisLoc{
         //publish lane State
         laneStatePub.publish(laneStateArray);
 
+
+        lanesPub.publish(lanesArray);
+
         // show images
         if(debugMode)
         {
@@ -270,7 +286,7 @@ class OttoCarVisLoc{
 //        polylineListFinal.clear();
         polyLineTypeList.clear();
         polyLinesParamList.clear();
-        PolyLineStateTripleList.clear();
+        PolyLineStateStructList.clear();
 
         cv::Mat topviewGrayImg, topviewGrayImgSmall, meanNeighborImgSmall, topviewThresholdImg, topviewThresholdImgSmall, tmpTopviewThresholdImgSmall, polyLineImg, houghImg, lineChainInputImg;
         cv::cvtColor(inputTopview, topviewGrayImg, CV_RGB2GRAY);        
@@ -369,7 +385,7 @@ class OttoCarVisLoc{
         //dstLanes = inputTopview.clone();
         if(debugMode)   drawPolyLinesFinal(dstLanes);
 
-        if(LaneStateTriple_current.empty() && LaneStateTriple_last.empty()) initCurrLaneState();
+        if(LaneStateStruct_current.empty() && LaneStateStruct_last.empty()) initCurrLaneState();
 
         //project polylines to base line
         projectPolylinesToBaseline();
@@ -381,10 +397,12 @@ class OttoCarVisLoc{
         updateLaneState();
 
         if(debugMode)   vizCurrLaneState(lanes_img_hor);
-        if(debugMode)   vizLaneStateList(lanes_img_hor, PolyLineStateTripleList);
+        if(debugMode)   vizLaneStateList(lanes_img_hor, PolyLineStateStructList);
 
         //calc return values for module interface
         setLaneStateArray();
+
+        setLanesArray();
 
         // resize for output visualisation
         cv::resize(topviewThresholdImgSmall, topviewThresholdImg, cv::Size(), resizeFactor, resizeFactor);
@@ -396,23 +414,36 @@ class OttoCarVisLoc{
         //dstLanes
     }
 
+    void setLanesArray()
+    {
+        lanesArray.data.clear();
+        for(int i=0; i<polylineList.size(); i++)
+        {
+            lanesArray.data.push_back(polylineList[i].size());
+            for(int k=0; k<polylineList[i].size(); k++)
+            {
+                lanesArray.data.push_back(polylineList[i][k].x);
+                lanesArray.data.push_back(polylineList[i][k].y);
+            }
+        }
+    }
     void setLaneStateArray()
     {
-        float confSum = LaneStateTriple_current[0].second.first + LaneStateTriple_current[1].second.first + LaneStateTriple_current[2].second.first;
-        float w_left = LaneStateTriple_current[0].second.first / confSum;
-        float w_mid = LaneStateTriple_current[1].second.first / confSum;
-        float w_right = LaneStateTriple_current[2].second.first / confSum;
+        float confSum = LaneStateStruct_current[0].confidence + LaneStateStruct_current[1].confidence + LaneStateStruct_current[2].confidence;
+        float w_left = LaneStateStruct_current[0].confidence / confSum;
+        float w_mid = LaneStateStruct_current[1].confidence / confSum;
+        float w_right = LaneStateStruct_current[2].confidence / confSum;
 
         //set x position of averaged mid lane
-        double posX = (double)(w_left*(LaneStateTriple_current[0].first.first.x + LANE_DETECTION_LANE_WIDTH) +
-                                w_mid*LaneStateTriple_current[1].first.first.x +
-                                w_right*(LaneStateTriple_current[2].first.first.x - LANE_DETECTION_LANE_WIDTH));
+        double posX = (double)(w_left*(LaneStateStruct_current[0].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH) +
+                                w_mid*LaneStateStruct_current[1].projectedToBaseLine.x +
+                                w_right*(LaneStateStruct_current[2].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH));
         //set vec
         cv::Point2f laneDir;
-        laneDir.x = (float)(w_left*LaneStateTriple_current[0].first.second.x + w_mid*LaneStateTriple_current[1].first.second.x + w_right*LaneStateTriple_current[2].first.second.x);
-        laneDir.x = (float)(w_left*LaneStateTriple_current[0].first.second.y + w_mid*LaneStateTriple_current[1].first.second.y + w_right*LaneStateTriple_current[2].first.second.y);
+        laneDir.x = (float)(w_left*LaneStateStruct_current[0].direction.x + w_mid*LaneStateStruct_current[1].direction.x + w_right*LaneStateStruct_current[2].direction.x);
+        laneDir.x = (float)(w_left*LaneStateStruct_current[0].direction.y + w_mid*LaneStateStruct_current[1].direction.y + w_right*LaneStateStruct_current[2].direction.y);
         //set confidence
-        double confidence = (double)(w_left*LaneStateTriple_current[0].second.first + w_mid*LaneStateTriple_current[1].second.first + w_right*LaneStateTriple_current[2].second.first);
+        double confidence = (double)(w_left*LaneStateStruct_current[0].confidence + w_mid*LaneStateStruct_current[1].confidence + w_right*LaneStateStruct_current[2].confidence);
 
         // calc deltas
         double deltaPosX_CarPosX = (double)(carPos.x - posX);
@@ -457,48 +488,48 @@ class OttoCarVisLoc{
         int vizLine = 200;
 
         cv::Scalar color;
-        for(int i=0; i<LaneStateTriple_current.size(); i++)
+        for(int i=0; i<LaneStateStruct_current.size(); i++)
         {
 
             if(i == 0)       color = CV_RGB(255,0,0);
             else if(i == 1)  color = CV_RGB(0,255,0);
             else if(i == 2)  color = CV_RGB(0,0,255);
-            cv::line( dstImg, cv::Point(LaneStateTriple_current[i].first.first.x, vizLine),
-                    cv::Point(LaneStateTriple_current[i].first.first.x - (int)(40*LaneStateTriple_current[i].first.second.x),
-                              vizLine - (int)(40*LaneStateTriple_current[i].first.second.y)), color, 1, CV_AA);
-            vizNumber(dstImg, (float)LaneStateTriple_current[i].second.first, cv::Point(LaneStateTriple_current[i].first.first.x, vizLine-30));
+            cv::line( dstImg, cv::Point(LaneStateStruct_current[i].projectedToBaseLine.x, vizLine),
+                    cv::Point(LaneStateStruct_current[i].projectedToBaseLine.x - (int)(40*LaneStateStruct_current[i].direction.x),
+                              vizLine - (int)(40*LaneStateStruct_current[i].direction.y)), color, 1, CV_AA);
+            vizNumber(dstImg, (float)LaneStateStruct_current[i].confidence, cv::Point(LaneStateStruct_current[i].projectedToBaseLine.x, vizLine-30));
 
             // viz construction range for current lane state
-            cv::line( dstImg, cv::Point(LaneStateTriple_last[i].first.first.x - LANE_STATE_CANDIDATE_POS_DELTA, vizLine),
-                    cv::Point(LaneStateTriple_last[i].first.first.x - LANE_STATE_CANDIDATE_POS_DELTA,
+            cv::line( dstImg, cv::Point(LaneStateStruct_last[i].projectedToBaseLine.x - LANE_STATE_CANDIDATE_POS_DELTA, vizLine),
+                    cv::Point(LaneStateStruct_last[i].projectedToBaseLine.x - LANE_STATE_CANDIDATE_POS_DELTA,
                               vizLine-10),color, 1, CV_AA);
 
-            cv::line( dstImg, cv::Point(LaneStateTriple_last[i].first.first.x + LANE_STATE_CANDIDATE_POS_DELTA, vizLine),
-                    cv::Point(LaneStateTriple_last[i].first.first.x + LANE_STATE_CANDIDATE_POS_DELTA,
+            cv::line( dstImg, cv::Point(LaneStateStruct_last[i].projectedToBaseLine.x + LANE_STATE_CANDIDATE_POS_DELTA, vizLine),
+                    cv::Point(LaneStateStruct_last[i].projectedToBaseLine.x + LANE_STATE_CANDIDATE_POS_DELTA,
                               vizLine-10),color, 1, CV_AA);
 
         }
     }
 
 
-    void vizLaneStateList(cv::Mat &dstImg, ListOfStateTriples &inputList )
+    void vizLaneStateList(cv::Mat &dstImg, ListOfStateStructs &inputList )
     {
         cv::Scalar color;
         for(int i=0; i<inputList.size(); i++)
         {
-            if(inputList[i].second.second == LANE_BORDER_CONTINOUS)
+            if(inputList[i].linetype == LANE_BORDER_CONTINOUS)
             {
                 color = CV_RGB(255,0,255);
-                vizNumber(dstImg, (float)inputList[i].second.first, inputList[i].first.first);
+                vizNumber(dstImg, (float)inputList[i].confidence, inputList[i].projectedToBaseLine);
             }
-            if(inputList[i].second.second == LANE_BORDER_DASHED)
+            if(inputList[i].linetype == LANE_BORDER_DASHED)
             {
                 color = CV_RGB(0,255,255);
-                vizNumber(dstImg, (float)inputList[i].second.first, cv::Point(inputList[i].first.first.x, inputList[i].first.first.y - 10));
+                vizNumber(dstImg, (float)inputList[i].confidence, cv::Point(inputList[i].projectedToBaseLine.x, inputList[i].projectedToBaseLine.y - 10));
             }
-            cv::line( dstImg, inputList[i].first.first,
-                    cv::Point(inputList[i].first.first.x - (int)(40*inputList[i].first.second.x),
-                              inputList[i].first.first.y - (int)(40*inputList[i].first.second.y)),
+            cv::line( dstImg, inputList[i].projectedToBaseLine,
+                    cv::Point(inputList[i].projectedToBaseLine.x - (int)(40*inputList[i].direction.x),
+                              inputList[i].projectedToBaseLine.y - (int)(40*inputList[i].direction.y)),
                     color, 1, CV_AA);
 
         }
@@ -507,81 +538,81 @@ class OttoCarVisLoc{
 
     void laneDetection()
     {
-        for(int i=0; i<PolyLineStateTripleList.size(); i++)
+        for(int i=0; i<PolyLineStateStructList.size(); i++)
         {
             //for each dashed line
-            if(PolyLineStateTripleList[i].second.second == LANE_BORDER_DASHED)
+            if(PolyLineStateStructList[i].linetype == LANE_BORDER_DASHED)
             {
-                for(int k=0; k<PolyLineStateTripleList.size(); k++)
+                for(int k=0; k<PolyLineStateStructList.size(); k++)
                 {
                     if(k==i) continue;
-                    if(PolyLineStateTripleList[k].second.second == LANE_BORDER_DASHED) continue;
-                    if(!checkVecsForSameDir(PolyLineStateTripleList[k].first.second, PolyLineStateTripleList[i].first.second)) continue;
+                    if(PolyLineStateStructList[k].linetype == LANE_BORDER_DASHED) continue;
+                    if(!checkVecsForSameDir(PolyLineStateStructList[k].direction, PolyLineStateStructList[i].direction)) continue;
 
                     //left corresponding line found
-                    if(PolyLineStateTripleList[k].first.first.x < PolyLineStateTripleList[i].first.first.x - LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
-                       PolyLineStateTripleList[k].first.first.x > PolyLineStateTripleList[i].first.first.x - LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
+                    if(PolyLineStateStructList[k].projectedToBaseLine.x < PolyLineStateStructList[i].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
+                       PolyLineStateStructList[k].projectedToBaseLine.x > PolyLineStateStructList[i].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
                     {
                         //increase conf
-                        PolyLineStateTripleList[k].second.first = PolyLineStateTripleList[k].second.first + 0.5;
-                        PolyLineStateTripleList[i].second.first = PolyLineStateTripleList[i].second.first + 0.5;
+                        PolyLineStateStructList[k].confidence = PolyLineStateStructList[k].confidence + 0.5;
+                        PolyLineStateStructList[i].confidence = PolyLineStateStructList[i].confidence + 0.5;
                     }
                     //right corresponding line found
-                    if(PolyLineStateTripleList[k].first.first.x < PolyLineStateTripleList[i].first.first.x + LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
-                       PolyLineStateTripleList[k].first.first.x > PolyLineStateTripleList[i].first.first.x + LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
+                    if(PolyLineStateStructList[k].projectedToBaseLine.x < PolyLineStateStructList[i].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
+                       PolyLineStateStructList[k].projectedToBaseLine.x > PolyLineStateStructList[i].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
                     {
                         //increase conf
-                        PolyLineStateTripleList[k].second.first = PolyLineStateTripleList[k].second.first + 0.5;
-                        PolyLineStateTripleList[i].second.first = PolyLineStateTripleList[i].second.first + 0.5;
+                        PolyLineStateStructList[k].confidence = PolyLineStateStructList[k].confidence + 0.5;
+                        PolyLineStateStructList[i].confidence = PolyLineStateStructList[i].confidence + 0.5;
                     }
                 }
             }
             //for each continous line
-            else if(PolyLineStateTripleList[i].second.second == LANE_BORDER_CONTINOUS)
+            else if(PolyLineStateStructList[i].linetype == LANE_BORDER_CONTINOUS)
             {
-                for(int k=0; k<PolyLineStateTripleList.size(); k++)
+                for(int k=0; k<PolyLineStateStructList.size(); k++)
                 {
                     if(k==i) continue;
-                    if(!checkVecsForSameDir(PolyLineStateTripleList[k].first.second, PolyLineStateTripleList[i].first.second)) continue;
+                    if(!checkVecsForSameDir(PolyLineStateStructList[k].direction, PolyLineStateStructList[i].direction)) continue;
 
                     // current is dashed
-                    if(PolyLineStateTripleList[k].second.second == LANE_BORDER_DASHED)
+                    if(PolyLineStateStructList[k].linetype == LANE_BORDER_DASHED)
                     {
                         //left corresponding mid line found
-                        if(PolyLineStateTripleList[k].first.first.x < PolyLineStateTripleList[i].first.first.x - LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
-                           PolyLineStateTripleList[k].first.first.x > PolyLineStateTripleList[i].first.first.x - LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
+                        if(PolyLineStateStructList[k].projectedToBaseLine.x < PolyLineStateStructList[i].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
+                           PolyLineStateStructList[k].projectedToBaseLine.x > PolyLineStateStructList[i].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
                         {
                             //increase conf
-                            PolyLineStateTripleList[k].second.first = PolyLineStateTripleList[k].second.first + 0.5;
-                            PolyLineStateTripleList[i].second.first = PolyLineStateTripleList[i].second.first + 0.5;
+                            PolyLineStateStructList[k].confidence = PolyLineStateStructList[k].confidence + 0.5;
+                            PolyLineStateStructList[i].confidence = PolyLineStateStructList[i].confidence + 0.5;
                         }
                         //right corresponding mid line found
-                        if(PolyLineStateTripleList[k].first.first.x < PolyLineStateTripleList[i].first.first.x + LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
-                           PolyLineStateTripleList[k].first.first.x > PolyLineStateTripleList[i].first.first.x + LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
+                        if(PolyLineStateStructList[k].projectedToBaseLine.x < PolyLineStateStructList[i].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
+                           PolyLineStateStructList[k].projectedToBaseLine.x > PolyLineStateStructList[i].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
                         {
                             //increase conf
-                            PolyLineStateTripleList[k].second.first = PolyLineStateTripleList[k].second.first + 0.5;
-                            PolyLineStateTripleList[i].second.first = PolyLineStateTripleList[i].second.first + 0.5;
+                            PolyLineStateStructList[k].confidence = PolyLineStateStructList[k].confidence + 0.5;
+                            PolyLineStateStructList[i].confidence = PolyLineStateStructList[i].confidence + 0.5;
                         }
                     }
                     // current is continous
-                    else if(PolyLineStateTripleList[k].second.second == LANE_BORDER_CONTINOUS)
+                    else if(PolyLineStateStructList[k].linetype == LANE_BORDER_CONTINOUS)
                     {
                         //left corresponding line found
-                        if(PolyLineStateTripleList[k].first.first.x < PolyLineStateTripleList[i].first.first.x - 2*LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
-                           PolyLineStateTripleList[k].first.first.x > PolyLineStateTripleList[i].first.first.x - 2*LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
+                        if(PolyLineStateStructList[k].projectedToBaseLine.x < PolyLineStateStructList[i].projectedToBaseLine.x - 2*LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
+                           PolyLineStateStructList[k].projectedToBaseLine.x > PolyLineStateStructList[i].projectedToBaseLine.x - 2*LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
                         {
                             //increase conf
-                            PolyLineStateTripleList[k].second.first = PolyLineStateTripleList[k].second.first + 0.5;
-                            PolyLineStateTripleList[i].second.first = PolyLineStateTripleList[i].second.first + 0.5;
+                            PolyLineStateStructList[k].confidence = PolyLineStateStructList[k].confidence + 0.5;
+                            PolyLineStateStructList[i].confidence = PolyLineStateStructList[i].confidence + 0.5;
                         }
                         //right corresponding line found
-                        if(PolyLineStateTripleList[k].first.first.x < PolyLineStateTripleList[i].first.first.x + 2*LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
-                           PolyLineStateTripleList[k].first.first.x > PolyLineStateTripleList[i].first.first.x + 2*LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
+                        if(PolyLineStateStructList[k].projectedToBaseLine.x < PolyLineStateStructList[i].projectedToBaseLine.x + 2*LANE_DETECTION_LANE_WIDTH + LANE_DETECTION_POS_DELTA &&
+                           PolyLineStateStructList[k].projectedToBaseLine.x > PolyLineStateStructList[i].projectedToBaseLine.x + 2*LANE_DETECTION_LANE_WIDTH - LANE_DETECTION_POS_DELTA)
                         {
                             //increase conf
-                            PolyLineStateTripleList[k].second.first = PolyLineStateTripleList[k].second.first + 0.5;
-                            PolyLineStateTripleList[i].second.first = PolyLineStateTripleList[i].second.first + 0.5;
+                            PolyLineStateStructList[k].confidence = PolyLineStateStructList[k].confidence + 0.5;
+                            PolyLineStateStructList[i].confidence = PolyLineStateStructList[i].confidence + 0.5;
                         }
                     }
                 }
@@ -602,68 +633,68 @@ class OttoCarVisLoc{
 
     void initCurrLaneState()
     {
-        StateTriple leftLane;
+        StateStruct leftLane;
         //set point
         //todo: do it with car pos
-        leftLane.first.first.x = 63;
-        leftLane.first.first.y = 290;
+        leftLane.projectedToBaseLine.x = 63;
+        leftLane.projectedToBaseLine.y = 290;
         //set vec
-        leftLane.first.second.x = (float)(0);
-        leftLane.first.second.y = (float)(1);
+        leftLane.direction.x = (float)(0);
+        leftLane.direction.y = (float)(1);
         //normalize vec
-        leftLane.first.second.x = leftLane.first.second.x / std::sqrt(std::pow(leftLane.first.second.x,2)
-                                                                            + std::pow(leftLane.first.second.y,2));
-        leftLane.first.second.y = leftLane.first.second.y / std::sqrt(std::pow(leftLane.first.second.x,2)
-                                                                            + std::pow(leftLane.first.second.y,2));
+        leftLane.direction.x = leftLane.direction.x / std::sqrt(std::pow(leftLane.direction.x,2)
+                                                                            + std::pow(leftLane.direction.y,2));
+        leftLane.direction.y = leftLane.direction.y / std::sqrt(std::pow(leftLane.direction.x,2)
+                                                                            + std::pow(leftLane.direction.y,2));
         //set confidence
-        leftLane.second.first = 0.5;
+        leftLane.confidence = 0.5;
         //set linetype
-        leftLane.second.second = LANE_BORDER_CONTINOUS;
+        leftLane.linetype = LANE_BORDER_CONTINOUS;
 
-        LaneStateTriple_current.push_back(leftLane);
-        LaneStateTriple_last.push_back(leftLane);
+        LaneStateStruct_current.push_back(leftLane);
+        LaneStateStruct_last.push_back(leftLane);
 
 
-        StateTriple midLane;
+        StateStruct midLane;
         //set point
-        midLane.first.first.x = 120;
-        midLane.first.first.y = 290;
+        midLane.projectedToBaseLine.x = 120;
+        midLane.projectedToBaseLine.y = 290;
         //set vec
-        midLane.first.second.x = (float)(0);
-        midLane.first.second.y = (float)(1);
+        midLane.direction.x = (float)(0);
+        midLane.direction.y = (float)(1);
         //normalize vec
-        midLane.first.second.x = midLane.first.second.x / std::sqrt(std::pow(midLane.first.second.x,2)
-                                                                            + std::pow(midLane.first.second.y,2));
-        midLane.first.second.y = midLane.first.second.y / std::sqrt(std::pow(midLane.first.second.x,2)
-                                                                            + std::pow(midLane.first.second.y,2));
+        midLane.direction.x = midLane.direction.x / std::sqrt(std::pow(midLane.direction.x,2)
+                                                                            + std::pow(midLane.direction.y,2));
+        midLane.direction.y = midLane.direction.y / std::sqrt(std::pow(midLane.direction.x,2)
+                                                                            + std::pow(midLane.direction.y,2));
         //set confidence
-        midLane.second.first = 0.5;
+        midLane.confidence = 0.5;
         //set linetype
-        midLane.second.second = LANE_BORDER_DASHED;
+        midLane.linetype = LANE_BORDER_DASHED;
 
-        LaneStateTriple_current.push_back(midLane);
-        LaneStateTriple_last.push_back(midLane);
+        LaneStateStruct_current.push_back(midLane);
+        LaneStateStruct_last.push_back(midLane);
 
 
-        StateTriple rightLane;
+        StateStruct rightLane;
         //set point
-        rightLane.first.first.x = 177;
-        rightLane.first.first.y = 290;
+        rightLane.projectedToBaseLine.x = 177;
+        rightLane.projectedToBaseLine.y = 290;
         //set vec
-        rightLane.first.second.x = (float)(0);
-        rightLane.first.second.y = (float)(1);
+        rightLane.direction.x = (float)(0);
+        rightLane.direction.y = (float)(1);
         //normalize vec
-        rightLane.first.second.x = rightLane.first.second.x / std::sqrt(std::pow(rightLane.first.second.x,2)
-                                                                            + std::pow(rightLane.first.second.y,2));
-        rightLane.first.second.y = rightLane.first.second.y / std::sqrt(std::pow(rightLane.first.second.x,2)
-                                                                            + std::pow(rightLane.first.second.y,2));
+        rightLane.direction.x = rightLane.direction.x / std::sqrt(std::pow(rightLane.direction.x,2)
+                                                                            + std::pow(rightLane.direction.y,2));
+        rightLane.direction.y = rightLane.direction.y / std::sqrt(std::pow(rightLane.direction.x,2)
+                                                                            + std::pow(rightLane.direction.y,2));
         //set confidence
-        rightLane.second.first = 0.5;
+        rightLane.confidence = 0.5;
         //set linetype
-        rightLane.second.second = LANE_BORDER_CONTINOUS;
+        rightLane.linetype = LANE_BORDER_CONTINOUS;
 
-        LaneStateTriple_current.push_back(rightLane);
-        LaneStateTriple_last.push_back(rightLane);
+        LaneStateStruct_current.push_back(rightLane);
+        LaneStateStruct_last.push_back(rightLane);
     }
 
 
@@ -672,42 +703,42 @@ class OttoCarVisLoc{
         // set polyLineTripleList
         for(int i=0; i<polylineList.size(); i++)
         {
-            StateTriple stateTriple;
+            StateStruct StateStruct;
             //todo: project point instead of just copying x value + use car pos for base line
             //set point
-            stateTriple.first.first.x = polylineList[i][0].x;
-            stateTriple.first.first.y = 290;
+            StateStruct.projectedToBaseLine.x = polylineList[i][0].x;
+            StateStruct.projectedToBaseLine.y = 290;
             //set vec
-            stateTriple.first.second.x = (float)(polylineList[i][0].x - polylineList[i][1].x);
-            stateTriple.first.second.y = (float)(polylineList[i][0].y - polylineList[i][1].y);
+            StateStruct.direction.x = (float)(polylineList[i][0].x - polylineList[i][1].x);
+            StateStruct.direction.y = (float)(polylineList[i][0].y - polylineList[i][1].y);
             //normalize vec
-            stateTriple.first.second.x = stateTriple.first.second.x / std::sqrt(std::pow(stateTriple.first.second.x,2)
-                                                                                + std::pow(stateTriple.first.second.y,2));
-            stateTriple.first.second.y = stateTriple.first.second.y / std::sqrt(std::pow(stateTriple.first.second.x,2)
-                                                                                + std::pow(stateTriple.first.second.y,2));
+            StateStruct.direction.x = StateStruct.direction.x / std::sqrt(std::pow(StateStruct.direction.x,2)
+                                                                                + std::pow(StateStruct.direction.y,2));
+            StateStruct.direction.y = StateStruct.direction.y / std::sqrt(std::pow(StateStruct.direction.x,2)
+                                                                                + std::pow(StateStruct.direction.y,2));
             //set confidence
-            stateTriple.second.first = polyLinesParamList[i].second;
+            StateStruct.confidence = polyLinesParamList[i].second;
 
             //set linetype
-            stateTriple.second.second = polyLineTypeList[i];
+            StateStruct.linetype = polyLineTypeList[i];
 
-            PolyLineStateTripleList.push_back(stateTriple);
+            PolyLineStateStructList.push_back(StateStruct);
         }
     }
 
 
     void setLaneStateCandidates()
     {
-        LaneStateTripleCandidate.clear();
+        LaneStateStructCandidate.clear();
         // also possible without folowing lists
         BorderLeftCandidateList.clear();
         BorderMidCandidateList.clear();
         BorderRightCandidateList.clear();
 
         //todo: limit ranges to images ranges
-        int leftRange[2] = {LaneStateTriple_last[0].first.first.x - LANE_STATE_CANDIDATE_POS_DELTA, LaneStateTriple_last[0].first.first.x + LANE_STATE_CANDIDATE_POS_DELTA};
-        int midRange[2] = {LaneStateTriple_last[1].first.first.x - LANE_STATE_CANDIDATE_POS_DELTA, LaneStateTriple_last[1].first.first.x + LANE_STATE_CANDIDATE_POS_DELTA};
-        int rightRange[2] = {LaneStateTriple_last[2].first.first.x - LANE_STATE_CANDIDATE_POS_DELTA, LaneStateTriple_last[2].first.first.x + LANE_STATE_CANDIDATE_POS_DELTA};
+        int leftRange[2] = {LaneStateStruct_last[0].projectedToBaseLine.x - LANE_STATE_CANDIDATE_POS_DELTA, LaneStateStruct_last[0].projectedToBaseLine.x + LANE_STATE_CANDIDATE_POS_DELTA};
+        int midRange[2] = {LaneStateStruct_last[1].projectedToBaseLine.x - LANE_STATE_CANDIDATE_POS_DELTA, LaneStateStruct_last[1].projectedToBaseLine.x + LANE_STATE_CANDIDATE_POS_DELTA};
+        int rightRange[2] = {LaneStateStruct_last[2].projectedToBaseLine.x - LANE_STATE_CANDIDATE_POS_DELTA, LaneStateStruct_last[2].projectedToBaseLine.x + LANE_STATE_CANDIDATE_POS_DELTA};
 
         float bestLeftConf[2] = {-1.0, -1.0}; // val; id in border candidate list
         float bestMidConf[2] = {-1.0, -1.0};
@@ -719,55 +750,55 @@ class OttoCarVisLoc{
 
         // SEARCH THE BEST FITTING LINE
         // ----------------------------
-        for(int i=0; i<PolyLineStateTripleList.size(); i++)
+        for(int i=0; i<PolyLineStateStructList.size(); i++)
         {
-            StateTriple currStateTriple = PolyLineStateTripleList[i];
+            StateStruct currStateStruct = PolyLineStateStructList[i];
             // test on left angle difference
             //last timestep is still current till it will be updated later in updateLaneState()!!!
-            if(std::abs(calcAngleBetweenVecs_float(currStateTriple.first.second, LaneStateTriple_current[0].first.second)) < LANE_STATE_CANDIDATE_ANGLE_DELTA)
+            if(std::abs(calcAngleBetweenVecs_float(currStateStruct.direction, LaneStateStruct_current[0].direction)) < LANE_STATE_CANDIDATE_ANGLE_DELTA)
             {
                 //test on left range
-                if(currStateTriple.first.first.x > leftRange[0] && currStateTriple.first.first.x < leftRange[1] &&
-                        currStateTriple.second.second == LANE_BORDER_CONTINOUS)
+                if(currStateStruct.projectedToBaseLine.x > leftRange[0] && currStateStruct.projectedToBaseLine.x < leftRange[1] &&
+                        currStateStruct.linetype == LANE_BORDER_CONTINOUS)
                 {
-                    BorderLeftCandidateList.push_back(currStateTriple);
+                    BorderLeftCandidateList.push_back(currStateStruct);
                     leftCounter++;
-                    if(bestLeftConf[0] < currStateTriple.second.first)
+                    if(bestLeftConf[0] < currStateStruct.confidence)
                     {
-                        bestLeftConf[0] = currStateTriple.second.first;
+                        bestLeftConf[0] = currStateStruct.confidence;
                         bestLeftConf[1] = (float)leftCounter;
                     }
                 }
             }
 
             // test on mid angle difference
-            if(std::abs(calcAngleBetweenVecs_float(currStateTriple.first.second, LaneStateTriple_current[1].first.second)) < LANE_STATE_CANDIDATE_ANGLE_DELTA)
+            if(std::abs(calcAngleBetweenVecs_float(currStateStruct.direction, LaneStateStruct_current[1].direction)) < LANE_STATE_CANDIDATE_ANGLE_DELTA)
             {
                 // test on mid range
-                if(currStateTriple.first.first.x > midRange[0] && currStateTriple.first.first.x < midRange[1] &&
-                        currStateTriple.second.second == LANE_BORDER_DASHED)
+                if(currStateStruct.projectedToBaseLine.x > midRange[0] && currStateStruct.projectedToBaseLine.x < midRange[1] &&
+                        currStateStruct.linetype == LANE_BORDER_DASHED)
                 {
-                    BorderMidCandidateList.push_back(currStateTriple);
+                    BorderMidCandidateList.push_back(currStateStruct);
                     midCounter++;
-                    if(bestMidConf[0] < currStateTriple.second.first)
+                    if(bestMidConf[0] < currStateStruct.confidence)
                     {
-                        bestMidConf[0] = currStateTriple.second.first;
+                        bestMidConf[0] = currStateStruct.confidence;
                         bestMidConf[1] = (float)midCounter;
                     }
                 }
             }
             // test on mid angle difference
-            if(std::abs(calcAngleBetweenVecs_float(currStateTriple.first.second, LaneStateTriple_current[2].first.second)) < LANE_STATE_CANDIDATE_ANGLE_DELTA)
+            if(std::abs(calcAngleBetweenVecs_float(currStateStruct.direction, LaneStateStruct_current[2].direction)) < LANE_STATE_CANDIDATE_ANGLE_DELTA)
             {
                 // test on right range
-                if(currStateTriple.first.first.x > rightRange[0] && currStateTriple.first.first.x < rightRange[1] &&
-                        currStateTriple.second.second == LANE_BORDER_CONTINOUS)
+                if(currStateStruct.projectedToBaseLine.x > rightRange[0] && currStateStruct.projectedToBaseLine.x < rightRange[1] &&
+                        currStateStruct.linetype == LANE_BORDER_CONTINOUS)
                 {
-                    BorderRightCandidateList.push_back(currStateTriple);
+                    BorderRightCandidateList.push_back(currStateStruct);
                     rightCounter++;
-                    if(bestRightConf[0] < currStateTriple.second.first)
+                    if(bestRightConf[0] < currStateStruct.confidence)
                     {
-                        bestRightConf[0] = currStateTriple.second.first;
+                        bestRightConf[0] = currStateStruct.confidence;
                         bestRightConf[1] = (float)rightCounter;
                     }
                 }
@@ -778,43 +809,43 @@ class OttoCarVisLoc{
 
         // SET LANE STATE CANDIDATES
         // -------------------------
-        StateTriple dummy;
+        StateStruct dummy;
         int lineFound[3] = {-1,-1,-1};
         int foundSum = 0;
         if((int)bestLeftConf[1] == -1)
         {
             lineFound[0] = 0;
-            LaneStateTripleCandidate.push_back(dummy);
+            LaneStateStructCandidate.push_back(dummy);
         }
         else
         {
             lineFound[0] = 1;
             foundSum++;
-            LaneStateTripleCandidate.push_back(BorderLeftCandidateList[(int)bestLeftConf[1]]);
+            LaneStateStructCandidate.push_back(BorderLeftCandidateList[(int)bestLeftConf[1]]);
         }
 
         if((int)bestMidConf[1] == -1)
         {
             lineFound[1] = 0;
-            LaneStateTripleCandidate.push_back(dummy);
+            LaneStateStructCandidate.push_back(dummy);
         }
         else
         {
             lineFound[1] = 1;
             foundSum++;
-            LaneStateTripleCandidate.push_back(BorderMidCandidateList[(int)bestMidConf[1]]);
+            LaneStateStructCandidate.push_back(BorderMidCandidateList[(int)bestMidConf[1]]);
         }
 
         if((int)bestRightConf[1] == -1)
         {
             lineFound[2] = 0;
-            LaneStateTripleCandidate.push_back(dummy);
+            LaneStateStructCandidate.push_back(dummy);
         }
         else
         {
             lineFound[2] = 1;
             foundSum++;
-            LaneStateTripleCandidate.push_back(BorderRightCandidateList[(int)bestRightConf[1]]);
+            LaneStateStructCandidate.push_back(BorderRightCandidateList[(int)bestRightConf[1]]);
         }
 
 
@@ -828,41 +859,41 @@ class OttoCarVisLoc{
                 if(lineFound[0] == 0)   //left
                 {
                     //update point
-                    LaneStateTripleCandidate[0].first.first.x = LaneStateTripleCandidate[1].first.first.x - (LaneStateTripleCandidate[2].first.first.x - LaneStateTripleCandidate[1].first.first.x);
-                    LaneStateTripleCandidate[0].first.first.y = LaneStateTripleCandidate[1].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[0].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x - (LaneStateStructCandidate[2].projectedToBaseLine.x - LaneStateStructCandidate[1].projectedToBaseLine.x);
+                    LaneStateStructCandidate[0].projectedToBaseLine.y = LaneStateStructCandidate[1].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[0].first.second.x = 0.5 * LaneStateTripleCandidate[1].first.second.x + 0.5 * LaneStateTripleCandidate[2].first.second.x;
-                    LaneStateTripleCandidate[0].first.second.y = 0.5 * LaneStateTripleCandidate[1].first.second.y + 0.5 * LaneStateTripleCandidate[2].first.second.y;
+                    LaneStateStructCandidate[0].direction.x = 0.5 * LaneStateStructCandidate[1].direction.x + 0.5 * LaneStateStructCandidate[2].direction.x;
+                    LaneStateStructCandidate[0].direction.y = 0.5 * LaneStateStructCandidate[1].direction.y + 0.5 * LaneStateStructCandidate[2].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[0].second.first = 0.5 * LaneStateTripleCandidate[1].second.first + 0.5 * LaneStateTripleCandidate[2].second.first;
+                    LaneStateStructCandidate[0].confidence = 0.5 * LaneStateStructCandidate[1].confidence + 0.5 * LaneStateStructCandidate[2].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[0].second.second = LANE_BORDER_CONTINOUS;
+                    LaneStateStructCandidate[0].linetype = LANE_BORDER_CONTINOUS;
                 }
                 else if(lineFound[1] == 0)  //mid
                 {
                     //update point
-                    LaneStateTripleCandidate[1].first.first.x = LaneStateTripleCandidate[0].first.first.x + (int)(0.5 * (float)(LaneStateTripleCandidate[2].first.first.x - LaneStateTripleCandidate[0].first.first.x));
-                    LaneStateTripleCandidate[1].first.first.y = LaneStateTripleCandidate[0].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[1].projectedToBaseLine.x = LaneStateStructCandidate[0].projectedToBaseLine.x + (int)(0.5 * (float)(LaneStateStructCandidate[2].projectedToBaseLine.x - LaneStateStructCandidate[0].projectedToBaseLine.x));
+                    LaneStateStructCandidate[1].projectedToBaseLine.y = LaneStateStructCandidate[0].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[1].first.second.x = 0.5 * LaneStateTripleCandidate[0].first.second.x + 0.5 * LaneStateTripleCandidate[2].first.second.x;
-                    LaneStateTripleCandidate[1].first.second.y = 0.5 * LaneStateTripleCandidate[0].first.second.y + 0.5 * LaneStateTripleCandidate[2].first.second.y;
+                    LaneStateStructCandidate[1].direction.x = 0.5 * LaneStateStructCandidate[0].direction.x + 0.5 * LaneStateStructCandidate[2].direction.x;
+                    LaneStateStructCandidate[1].direction.y = 0.5 * LaneStateStructCandidate[0].direction.y + 0.5 * LaneStateStructCandidate[2].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[1].second.first = 0.5 * LaneStateTripleCandidate[0].second.first + 0.5 * LaneStateTripleCandidate[2].second.first;
+                    LaneStateStructCandidate[1].confidence = 0.5 * LaneStateStructCandidate[0].confidence + 0.5 * LaneStateStructCandidate[2].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[1].second.second = LANE_BORDER_DASHED;
+                    LaneStateStructCandidate[1].linetype = LANE_BORDER_DASHED;
                 }
                 else if(lineFound[2] == 0)  //rigth
                 {
                     //update point
-                    LaneStateTripleCandidate[2].first.first.x = LaneStateTripleCandidate[1].first.first.x + (LaneStateTripleCandidate[1].first.first.x - LaneStateTripleCandidate[0].first.first.x);
-                    LaneStateTripleCandidate[2].first.first.y = LaneStateTripleCandidate[0].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[2].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x + (LaneStateStructCandidate[1].projectedToBaseLine.x - LaneStateStructCandidate[0].projectedToBaseLine.x);
+                    LaneStateStructCandidate[2].projectedToBaseLine.y = LaneStateStructCandidate[0].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[2].first.second.x = 0.5 * LaneStateTripleCandidate[0].first.second.x + 0.5 * LaneStateTripleCandidate[1].first.second.x;
-                    LaneStateTripleCandidate[2].first.second.y = 0.5 * LaneStateTripleCandidate[0].first.second.y + 0.5 * LaneStateTripleCandidate[1].first.second.y;
+                    LaneStateStructCandidate[2].direction.x = 0.5 * LaneStateStructCandidate[0].direction.x + 0.5 * LaneStateStructCandidate[1].direction.x;
+                    LaneStateStructCandidate[2].direction.y = 0.5 * LaneStateStructCandidate[0].direction.y + 0.5 * LaneStateStructCandidate[1].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[2].second.first = 0.5 * LaneStateTripleCandidate[0].second.first + 0.5 * LaneStateTripleCandidate[1].second.first;
+                    LaneStateStructCandidate[2].confidence = 0.5 * LaneStateStructCandidate[0].confidence + 0.5 * LaneStateStructCandidate[1].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[2].second.second = LANE_BORDER_CONTINOUS;
+                    LaneStateStructCandidate[2].linetype = LANE_BORDER_CONTINOUS;
                 }
             }
             // simulate two lines
@@ -871,74 +902,74 @@ class OttoCarVisLoc{
                 if(lineFound[0] == 1)   //left
                 {
                     //update point
-                    LaneStateTripleCandidate[1].first.first.x = LaneStateTripleCandidate[0].first.first.x + LANE_DETECTION_LANE_WIDTH;
-                    LaneStateTripleCandidate[1].first.first.y = LaneStateTripleCandidate[0].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[1].projectedToBaseLine.x = LaneStateStructCandidate[0].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH;
+                    LaneStateStructCandidate[1].projectedToBaseLine.y = LaneStateStructCandidate[0].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[1].first.second.x = LaneStateTripleCandidate[0].first.second.x;
-                    LaneStateTripleCandidate[1].first.second.y = LaneStateTripleCandidate[0].first.second.y;
+                    LaneStateStructCandidate[1].direction.x = LaneStateStructCandidate[0].direction.x;
+                    LaneStateStructCandidate[1].direction.y = LaneStateStructCandidate[0].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[1].second.first = LaneStateTripleCandidate[0].second.first;
+                    LaneStateStructCandidate[1].confidence = LaneStateStructCandidate[0].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[1].second.second = LANE_BORDER_DASHED;
+                    LaneStateStructCandidate[1].linetype = LANE_BORDER_DASHED;
 
                     //update point
-                    LaneStateTripleCandidate[2].first.first.x = LaneStateTripleCandidate[1].first.first.x + LANE_DETECTION_LANE_WIDTH;
-                    LaneStateTripleCandidate[2].first.first.y = LaneStateTripleCandidate[0].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[2].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH;
+                    LaneStateStructCandidate[2].projectedToBaseLine.y = LaneStateStructCandidate[0].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[2].first.second.x = LaneStateTripleCandidate[0].first.second.x;
-                    LaneStateTripleCandidate[2].first.second.y = LaneStateTripleCandidate[0].first.second.y;
+                    LaneStateStructCandidate[2].direction.x = LaneStateStructCandidate[0].direction.x;
+                    LaneStateStructCandidate[2].direction.y = LaneStateStructCandidate[0].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[2].second.first = LaneStateTripleCandidate[0].second.first;
+                    LaneStateStructCandidate[2].confidence = LaneStateStructCandidate[0].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[2].second.second = LANE_BORDER_CONTINOUS;
+                    LaneStateStructCandidate[2].linetype = LANE_BORDER_CONTINOUS;
                 }
                 else if(lineFound[1] == 1)  //mid
                 {
                     //update point
-                    LaneStateTripleCandidate[0].first.first.x = LaneStateTripleCandidate[1].first.first.x - LANE_DETECTION_LANE_WIDTH;
-                    LaneStateTripleCandidate[0].first.first.y = LaneStateTripleCandidate[1].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[0].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH;
+                    LaneStateStructCandidate[0].projectedToBaseLine.y = LaneStateStructCandidate[1].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[0].first.second.x = LaneStateTripleCandidate[1].first.second.x;
-                    LaneStateTripleCandidate[0].first.second.y = LaneStateTripleCandidate[1].first.second.y;
+                    LaneStateStructCandidate[0].direction.x = LaneStateStructCandidate[1].direction.x;
+                    LaneStateStructCandidate[0].direction.y = LaneStateStructCandidate[1].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[0].second.first = LaneStateTripleCandidate[1].second.first;
+                    LaneStateStructCandidate[0].confidence = LaneStateStructCandidate[1].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[0].second.second = LANE_BORDER_CONTINOUS;
+                    LaneStateStructCandidate[0].linetype = LANE_BORDER_CONTINOUS;
 
                     //update point
-                    LaneStateTripleCandidate[2].first.first.x = LaneStateTripleCandidate[1].first.first.x + LANE_DETECTION_LANE_WIDTH;
-                    LaneStateTripleCandidate[2].first.first.y = LaneStateTripleCandidate[1].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[2].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x + LANE_DETECTION_LANE_WIDTH;
+                    LaneStateStructCandidate[2].projectedToBaseLine.y = LaneStateStructCandidate[1].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[2].first.second.x = LaneStateTripleCandidate[1].first.second.x;
-                    LaneStateTripleCandidate[2].first.second.y = LaneStateTripleCandidate[1].first.second.y;
+                    LaneStateStructCandidate[2].direction.x = LaneStateStructCandidate[1].direction.x;
+                    LaneStateStructCandidate[2].direction.y = LaneStateStructCandidate[1].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[2].second.first = LaneStateTripleCandidate[1].second.first;
+                    LaneStateStructCandidate[2].confidence = LaneStateStructCandidate[1].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[2].second.second = LANE_BORDER_CONTINOUS;
+                    LaneStateStructCandidate[2].linetype = LANE_BORDER_CONTINOUS;
                 }
                 else if(lineFound[2] == 1)  //rigth
                 {
                     //update point
-                    LaneStateTripleCandidate[1].first.first.x = LaneStateTripleCandidate[2].first.first.x - LANE_DETECTION_LANE_WIDTH;
-                    LaneStateTripleCandidate[1].first.first.y = LaneStateTripleCandidate[2].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[1].projectedToBaseLine.x = LaneStateStructCandidate[2].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH;
+                    LaneStateStructCandidate[1].projectedToBaseLine.y = LaneStateStructCandidate[2].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[1].first.second.x = LaneStateTripleCandidate[2].first.second.x;
-                    LaneStateTripleCandidate[1].first.second.y = LaneStateTripleCandidate[2].first.second.y;
+                    LaneStateStructCandidate[1].direction.x = LaneStateStructCandidate[2].direction.x;
+                    LaneStateStructCandidate[1].direction.y = LaneStateStructCandidate[2].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[1].second.first = LaneStateTripleCandidate[2].second.first;
+                    LaneStateStructCandidate[1].confidence = LaneStateStructCandidate[2].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[1].second.second = LANE_BORDER_DASHED;
+                    LaneStateStructCandidate[1].linetype = LANE_BORDER_DASHED;
 
                     //update point
-                    LaneStateTripleCandidate[0].first.first.x = LaneStateTripleCandidate[1].first.first.x - LANE_DETECTION_LANE_WIDTH;
-                    LaneStateTripleCandidate[0].first.first.y = LaneStateTripleCandidate[2].first.first.y; // baseline is everytime in the same height
+                    LaneStateStructCandidate[0].projectedToBaseLine.x = LaneStateStructCandidate[1].projectedToBaseLine.x - LANE_DETECTION_LANE_WIDTH;
+                    LaneStateStructCandidate[0].projectedToBaseLine.y = LaneStateStructCandidate[2].projectedToBaseLine.y; // baseline is everytime in the same height
                     //update vec
-                    LaneStateTripleCandidate[0].first.second.x = LaneStateTripleCandidate[2].first.second.x;
-                    LaneStateTripleCandidate[0].first.second.y = LaneStateTripleCandidate[2].first.second.y;
+                    LaneStateStructCandidate[0].direction.x = LaneStateStructCandidate[2].direction.x;
+                    LaneStateStructCandidate[0].direction.y = LaneStateStructCandidate[2].direction.y;
                     //update confidence
-                    LaneStateTripleCandidate[0].second.first = LaneStateTripleCandidate[2].second.first;
+                    LaneStateStructCandidate[0].confidence = LaneStateStructCandidate[2].confidence;
                     //lane type keeps the same
-                    LaneStateTripleCandidate[0].second.second = LANE_BORDER_CONTINOUS;
+                    LaneStateStructCandidate[0].linetype = LANE_BORDER_CONTINOUS;
                 }
             }
         }
@@ -950,15 +981,15 @@ class OttoCarVisLoc{
             for(int i=0; i < 3; i++)
             {
                 //update point
-                LaneStateTripleCandidate[i].first.first.x = LaneStateTriple_current[i].first.first.x;
-                LaneStateTripleCandidate[i].first.first.y = LaneStateTriple_current[i].first.first.y;
+                LaneStateStructCandidate[i].projectedToBaseLine.x = LaneStateStruct_current[i].projectedToBaseLine.x;
+                LaneStateStructCandidate[i].projectedToBaseLine.y = LaneStateStruct_current[i].projectedToBaseLine.y;
                 //update vec
-                LaneStateTripleCandidate[i].first.second.x = LaneStateTriple_current[i].first.second.x;
-                LaneStateTripleCandidate[i].first.second.y = LaneStateTriple_current[i].first.second.y;
+                LaneStateStructCandidate[i].direction.x = LaneStateStruct_current[i].direction.x;
+                LaneStateStructCandidate[i].direction.y = LaneStateStruct_current[i].direction.y;
                 //update confidence
-                LaneStateTripleCandidate[i].second.first = LaneStateTriple_current[i].second.first;
+                LaneStateStructCandidate[i].confidence = LaneStateStruct_current[i].confidence;
                 //lane type keeps the same
-                LaneStateTripleCandidate[i].second.second = LaneStateTriple_current[i].second.second;
+                LaneStateStructCandidate[i].linetype = LaneStateStruct_current[i].linetype;
 
             }
         }
@@ -969,15 +1000,15 @@ class OttoCarVisLoc{
     {
         //ROS_INFO_STREAM("a");
         // set time step
-        LaneStateTriple_last.clear();
-        StateTriple laneBorder;
-        laneBorder = LaneStateTriple_current[0];
-        LaneStateTriple_last.push_back(laneBorder);
-        laneBorder = LaneStateTriple_current[1];
-        LaneStateTriple_last.push_back(laneBorder);
-        laneBorder = LaneStateTriple_current[2];
-        LaneStateTriple_last.push_back(laneBorder);
-        LaneStateTriple_current.clear();
+        LaneStateStruct_last.clear();
+        StateStruct laneBorder;
+        laneBorder = LaneStateStruct_current[0];
+        LaneStateStruct_last.push_back(laneBorder);
+        laneBorder = LaneStateStruct_current[1];
+        LaneStateStruct_last.push_back(laneBorder);
+        laneBorder = LaneStateStruct_current[2];
+        LaneStateStruct_last.push_back(laneBorder);
+        LaneStateStruct_current.clear();
 
         //ROS_INFO_STREAM("b");
 
@@ -989,21 +1020,21 @@ class OttoCarVisLoc{
 
         // a(t) = k * a(t) + (1-k) * a(t-1)
         // go to lanes
-        for(int i=0; i<LaneStateTripleCandidate.size(); i++)
+        for(int i=0; i<LaneStateStructCandidate.size(); i++)
         {
             //ROS_INFO_STREAM("it:" << i);
-            StateTriple laneBorder;
+            StateStruct laneBorder;
             //update point
-            laneBorder.first.first.x = (int)round((double) k * LaneStateTripleCandidate[i].first.first.x + (1.0-k) * LaneStateTriple_last[i].first.first.x);
-            laneBorder.first.first.y = (int)round((double) k * LaneStateTripleCandidate[i].first.first.y + (1.0-k) * LaneStateTriple_last[i].first.first.y);
+            laneBorder.projectedToBaseLine.x = (int)round((double) k * LaneStateStructCandidate[i].projectedToBaseLine.x + (1.0-k) * LaneStateStruct_last[i].projectedToBaseLine.x);
+            laneBorder.projectedToBaseLine.y = (int)round((double) k * LaneStateStructCandidate[i].projectedToBaseLine.y + (1.0-k) * LaneStateStruct_last[i].projectedToBaseLine.y);
             //update vec
-            laneBorder.first.second.x = k * LaneStateTripleCandidate[i].first.second.x + (1.0-k) * LaneStateTriple_last[i].first.second.x;
-            laneBorder.first.second.y = k * LaneStateTripleCandidate[i].first.second.y + (1.0-k) * LaneStateTriple_last[i].first.second.y;
+            laneBorder.direction.x = k * LaneStateStructCandidate[i].direction.x + (1.0-k) * LaneStateStruct_last[i].direction.x;
+            laneBorder.direction.y = k * LaneStateStructCandidate[i].direction.y + (1.0-k) * LaneStateStruct_last[i].direction.y;
             //update confidence
-            laneBorder.second.first = k * LaneStateTripleCandidate[i].second.first + (1.0-k) * LaneStateTriple_last[i].second.first;
+            laneBorder.confidence = k * LaneStateStructCandidate[i].confidence + (1.0-k) * LaneStateStruct_last[i].confidence;
             //lane type keeps the same
 
-            LaneStateTriple_current.push_back(laneBorder);
+            LaneStateStruct_current.push_back(laneBorder);
         }
     }
 
