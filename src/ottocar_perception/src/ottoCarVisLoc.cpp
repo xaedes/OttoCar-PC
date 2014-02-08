@@ -21,18 +21,18 @@
 // Parameters
 // ----------
 
-bool showWindows = false;
-bool debugMode = false;
+bool debugMode = true; // flags for cv::windows
+bool vizMode = true; // flag for visualization
 static const std::string OPENCV_WINDOW_rgb = "rgb input";
 static const std::string OPENCV_WINDOW_topview = "topview";
-static const std::string OPENCV_WINDOW_topview_roi = "topview ROI";
+static const std::string OPENCV_WINDOW_topview_roi = "topview ROI + line chain creation";
 static const std::string OPENCV_WINDOW_lines = "line detection ";
 static const std::string OPENCV_WINDOW_lines_morph = "line detection morphed";
-static const std::string OPENCV_WINDOW_lanes_hor = "test lane state";
+static const std::string OPENCV_WINDOW_lanes_hor = "lane state";
 static const std::string OPENCV_WINDOW_lanes_vert = "lines final";
 
-const char* projMatFilename = "/home/ottocar/OttoCar-Panda/workspace/src/ottocar_perception/visLoc_TopviewCalib_ProjMat.txt";
-const char* configFilename = "/home/ottocar/OttoCar-Panda/workspace/src/ottocar_perception/visLoc_TopviewCalib_Config.txt";
+const char* projMatFilename = "/home/ottocar/visLoc_TopviewCalib_ProjMat.txt";
+const char* configFilename = "/home/ottocar/visLoc_TopviewCalib_Config.txt";
 
 bool resizeTopviewOutput = false;
 bool visCarPos = false;
@@ -50,7 +50,7 @@ bool useProcessingRoi = true;
 
 // Lane Model
 
-int LANE_DETECTION_LANE_WIDTH = 57; // lane width in pixel of topview
+int LANE_DETECTION_LANE_WIDTH;// = 57; // lane width in pixel of topview
 int LANE_DETECTION_POS_DELTA = 10; // position delta in +-pixel of topview
 float LANE_DETECTION_ANGLE_DELTA = 10.0; // angle delta in +-degree
 
@@ -105,10 +105,7 @@ class OttoCarVisLoc{
      } StateStruct;
      StateStruct CurrMidLaneState;
      typedef std::vector<StateStruct> ListOfStateStructs;
-     
      ListOfStateStructs PolyLineStateStructList, BorderLeftCandidateList, BorderMidCandidateList, BorderRightCandidateList, LaneStateStructCandidate, LaneStateStruct_current, LaneStateStruct_last; // Laneborder_left ; LaneBorder_mid; Laneborder_right
-    
-
      // point; vec; confidence ; linetype
 
     public:
@@ -119,6 +116,8 @@ class OttoCarVisLoc{
         H.create(3,3,CV_64F);
         loadDoubleMatFromFile(H, projMatFilename, 3, 3);
         loadCalibConfigFromFile(topviewSize, carPos, configFilename);
+
+        LANE_DETECTION_LANE_WIDTH = (int)round((double)(41.0 / PIXEL_TO_CENTIMETER));
 
         if(useProcessingRoi)
         {
@@ -140,7 +139,7 @@ class OttoCarVisLoc{
         laneMidPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/lanes/mid", 1);
         laneRightPub= nh_.advertise<std_msgs::Float64MultiArray>("ottocar_perception/lanes/right", 1);
 
-        if(showWindows && debugMode)
+        if(debugMode)
         {
             cv::namedWindow(OPENCV_WINDOW_rgb);
             cv::namedWindow(OPENCV_WINDOW_topview);
@@ -154,7 +153,7 @@ class OttoCarVisLoc{
 
     ~OttoCarVisLoc()
     {
-        if(showWindows && debugMode)
+        if(debugMode)
         {
             cv::destroyWindow(OPENCV_WINDOW_rgb);
             cv::destroyWindow(OPENCV_WINDOW_topview);
@@ -191,6 +190,7 @@ class OttoCarVisLoc{
 
         // Output modified video streams
         cv_ptr->image = lanes_img_hor.clone();
+        // Output modified video stream
         image_pub_rgb.publish(cv_ptr->toImageMsg());//cv::FileStorage file("some_name.ext", cv::FileStorage::WRITE);
 
 
@@ -199,8 +199,6 @@ class OttoCarVisLoc{
         cv_ptr->encoding = sensor_msgs::image_encodings::MONO8;
         image_pub_bw.publish(cv_ptr->toImageMsg());//cv::FileStorage file("some_name.ext", cv::FileStorage::WRITE);
     }
-
-    // void publish_img(image_transport::Publisher& publisher, cv::Mat &img, encoding)
 
     void processImage(cv::Mat& inputImg)
     {
@@ -243,8 +241,8 @@ class OttoCarVisLoc{
         }
         if(meanHorizontalNeighborKernel.empty())
         {
-            createHorizontalMeanNeighborKernel(meanHorizontalNeighborKernel, NEIGHBOR_KERNEL_SIZE);
-            //cv::transpose(meanHorizontalNeighborKernel, meanHorizontalNeighborKernel);
+            createHorizontalMeanNeighborKernel(meanHorizontalNeighborKernel, 5);
+            cv::transpose(meanHorizontalNeighborKernel, meanHorizontalNeighborKernel);
         }
         clock_t startLaneMarks = clock();        
         detectLaneMarksV2(topviewRoi_img, /*meanHorizontalNeighborKernel*/ meanQuadraticNeighborKernel, lines_img, linesMorph_img, lanes_img_vert);
@@ -287,9 +285,9 @@ class OttoCarVisLoc{
 
 
         // show images
-        if(showWindows && debugMode)
+        if(debugMode)
         {
-            cv::imshow(OPENCV_WINDOW_rgb, inputImg);
+            //cv::imshow(OPENCV_WINDOW_rgb, inputImg);
             cv::imshow(OPENCV_WINDOW_topview, topview_img);
             cv::imshow(OPENCV_WINDOW_topview_roi, topviewRoi_img);
             cv::imshow(OPENCV_WINDOW_lines, lines_img);
@@ -375,21 +373,33 @@ class OttoCarVisLoc{
                     }
                 }
             }
-        }
+        }        
 
         // BINARY IMAGE POSTPROCESSING
         //-------------------------
+
         // Morphological open --> detecting big white areas
-//        cv::Mat tmpThresh_2 = topviewThresholdImgSmall.clone();
-//        cv::Mat opingKernel = cv::getStructuringElement(cv::MORPH_ELLIPSE , cv::Size(3, 3));
-//        cv::erode(topviewThresholdImgSmall, tmpTopviewThresholdImgSmall, opingKernel);
-//        cv::dilate(tmpTopviewThresholdImgSmall, topviewThresholdImgSmall, opingKernel);
+        cv::Mat bigWhiteObjectsImg;
+        cv::Mat bigOpingKernel = cv::getStructuringElement(cv::MORPH_CROSS , cv::Size(3, 3));
+        cv::erode(topviewThresholdImgSmall, tmpTopviewThresholdImgSmall, bigOpingKernel, cv::Point(-1,-1), 3);
+        cv::dilate(tmpTopviewThresholdImgSmall, bigWhiteObjectsImg, bigOpingKernel, cv::Point(-1,-1), 3);
+        if(debugMode)   cv::imshow("big white objects", bigWhiteObjectsImg);
+
+        // subtract big white objects from binary image
+        cv::Mat diffBigObjectsImg = topviewThresholdImgSmall - bigWhiteObjectsImg;
+        if(debugMode)   cv::imshow("DIFF big white objects", diffBigObjectsImg);
+        topviewThresholdImgSmall = diffBigObjectsImg.clone();
+
 
         // Morphological open --> reduce noise
         cv::Mat tmpThresh = topviewThresholdImgSmall.clone();
         cv::Mat opingKernel = cv::getStructuringElement(cv::MORPH_ELLIPSE , cv::Size(3, 3));
         cv::erode(topviewThresholdImgSmall, tmpTopviewThresholdImgSmall, opingKernel);
         cv::dilate(tmpTopviewThresholdImgSmall, topviewThresholdImgSmall, opingKernel);
+
+
+        // use vertical kernel to detect horizontal lines
+
 
 //        // moprhological close in vertical direction
 //        cv::Mat tmpThreshClosed = topviewThresholdImgSmall.clone();
@@ -429,7 +439,7 @@ class OttoCarVisLoc{
 
         combineDashedLines();
         //dstLanes = inputTopview.clone();
-        if(debugMode)   drawPolyLinesFinal(dstLanes);
+        if(vizMode)   drawPolyLinesFinal(dstLanes);
 
         if(LaneStateStruct_current.empty() && LaneStateStruct_last.empty()) initCurrLaneState();
 
@@ -437,21 +447,20 @@ class OttoCarVisLoc{
         projectPolylinesToBaseline();
         //lane detection
         laneDetection();
-        //set candidate Triple
+        //set candidate Struct
         setLaneStateCandidates();
-        //update lane state triple
+        //update lane state Struct
         updateLaneState();
 
-        
-        vizCurrLanesState(lanes_img_hor);
-        vizLaneStateList(lanes_img_hor, PolyLineStateStructList);
+        if(vizMode)   vizCurrLanesState(lanes_img_hor);
+        if(vizMode)   vizLaneStateList(lanes_img_hor, PolyLineStateStructList);
 
         //calc return values for module interface
         setLaneStateArray();
 
         setLanesArrays();
 
-        vizCurrMidLaneState(lanes_img_hor);
+        if(vizMode)   vizCurrMidLaneState(lanes_img_hor);
 
         // resize for output visualisation
         cv::resize(topviewThresholdImgSmall, topviewThresholdImg, cv::Size(), resizeFactor, resizeFactor);
@@ -619,12 +628,18 @@ class OttoCarVisLoc{
             if(inputList[i].linetype == LANE_BORDER_CONTINOUS)
             {
                 color = CV_RGB(255,0,255);
-                vizNumber(dstImg, (float)inputList[i].confidence, inputList[i].projectedToBaseLine);
+
+                if(inputList[i].confidence > 2.0)     vizNumber_color(dstImg, (float)inputList[i].confidence, inputList[i].projectedToBaseLine, CV_RGB(0,200,0));
+                else if(inputList[i].confidence > 1.0)     vizNumber_color(dstImg, (float)inputList[i].confidence, inputList[i].projectedToBaseLine, CV_RGB(0,0,200));
+                else                                    vizNumber(dstImg, (float)inputList[i].confidence, inputList[i].projectedToBaseLine);
             }
             if(inputList[i].linetype == LANE_BORDER_DASHED)
             {
                 color = CV_RGB(0,255,255);
-                vizNumber(dstImg, (float)inputList[i].confidence, cv::Point(inputList[i].projectedToBaseLine.x, inputList[i].projectedToBaseLine.y - 10));
+
+                if(inputList[i].confidence > 2.0)     vizNumber_color(dstImg, (float)inputList[i].confidence, cv::Point(inputList[i].projectedToBaseLine.x, inputList[i].projectedToBaseLine.y - 10), CV_RGB(0,200,0));
+                else if(inputList[i].confidence > 1.0)     vizNumber_color(dstImg, (float)inputList[i].confidence, cv::Point(inputList[i].projectedToBaseLine.x, inputList[i].projectedToBaseLine.y - 10), CV_RGB(0,0,200));
+                else                                    vizNumber(dstImg, (float)inputList[i].confidence, cv::Point(inputList[i].projectedToBaseLine.x, inputList[i].projectedToBaseLine.y - 10));
             }
             cv::line( dstImg, inputList[i].projectedToBaseLine,
                     cv::Point(inputList[i].projectedToBaseLine.x - (int)(40*inputList[i].direction.x),
@@ -732,10 +747,10 @@ class OttoCarVisLoc{
 
     void initCurrLaneState()
     {
+        //init or reset lanestate to middle of rigth lane
         StateStruct leftLane;
         //set point
-        //todo: do it with car pos
-        leftLane.projectedToBaseLine.x = 63;
+        leftLane.projectedToBaseLine.x = (int)(carPos.x - 1.5 *((float)LANE_DETECTION_LANE_WIDTH));
         leftLane.projectedToBaseLine.y = 290;
         //set vec
         leftLane.direction.x = (float)(0);
@@ -756,7 +771,7 @@ class OttoCarVisLoc{
 
         StateStruct midLane;
         //set point
-        midLane.projectedToBaseLine.x = 120;
+        midLane.projectedToBaseLine.x = (int)(carPos.x - 0.5 *((float)LANE_DETECTION_LANE_WIDTH));
         midLane.projectedToBaseLine.y = 290;
         //set vec
         midLane.direction.x = (float)(0);
@@ -777,7 +792,7 @@ class OttoCarVisLoc{
 
         StateStruct rightLane;
         //set point
-        rightLane.projectedToBaseLine.x = 177;
+        rightLane.projectedToBaseLine.x = (int)(carPos.x + 0.5 *((float)LANE_DETECTION_LANE_WIDTH));
         rightLane.projectedToBaseLine.y = 290;
         //set vec
         rightLane.direction.x = (float)(0);
@@ -799,7 +814,7 @@ class OttoCarVisLoc{
 
     void projectPolylinesToBaseline()
     {
-        // set polyLineTripleList
+        // set polyLineStructList
         for(int i=0; i<polylineList.size(); i++)
         {
             StateStruct stateStruct;
@@ -811,7 +826,7 @@ class OttoCarVisLoc{
             //ERROR in HERE??? target - src?
             stateStruct.direction.x = (float)(polylineList[i][0].x - polylineList[i][1].x);
             stateStruct.direction.y = (float)(polylineList[i][0].y - polylineList[i][1].y);
-            //stateStruct vec
+            //normalize vec
             stateStruct.direction.x = stateStruct.direction.x / std::sqrt(std::pow(stateStruct.direction.x,2)
                                                                                 + std::pow(stateStruct.direction.y,2));
             stateStruct.direction.y = stateStruct.direction.y / std::sqrt(std::pow(stateStruct.direction.x,2)
@@ -1260,6 +1275,7 @@ class OttoCarVisLoc{
                 }
 
                 processed[i] = 1;
+
                 if(belongingFound || !belongingFound)
                 {
                     // calc and append line params
@@ -1316,7 +1332,7 @@ class OttoCarVisLoc{
 
             // line b lies in orientation direction of line a
             float angle2Next = std::abs(calcAngleBetweenVecs(vecA, vec2Next));
-            if(angle2Next > 10.0) continue;
+            if(angle2Next > 15.0) continue;
 
             // orientation of line b must be in +-20 degree of line a orientation
             cv::Point vecB(polylineListDashed[k][polylineListDashed[k].size()-1].x - polylineListDashed[k][0].x, polylineListDashed[k][polylineListDashed[k].size()-1].y - polylineListDashed[k][0].y);
@@ -1413,7 +1429,7 @@ class OttoCarVisLoc{
 
             // VIZUALISATION
             // -------------
-            if(debugMode)
+            if(vizMode)
             {
                 vizNumber(dstPolylineImg, angleChangeConf, polyLine[0]);
                 for(int k=0; k<polyLine.size()-1; k++)
@@ -1702,6 +1718,13 @@ class OttoCarVisLoc{
         char text[255];
         sprintf(text, "%.2f", number);
         cv::putText(dstImg, text, pos, CV_FONT_HERSHEY_SIMPLEX, 0.25, cvScalar(0,0,0));
+    }
+
+    void vizNumber_color(cv::Mat &dstImg, float number, cv::Point pos, cv::Scalar color)
+    {
+        char text[255];
+        sprintf(text, "%.2f", number);
+        cv::putText(dstImg, text, pos, CV_FONT_HERSHEY_SIMPLEX, 0.25, color);
     }
 
     double diffclock(clock_t clock1,clock_t clock2)
